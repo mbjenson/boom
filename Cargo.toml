@@ -21,3 +21,18 @@ uuid = "1.8.0"
 [dependencies.mongodb]
 version = "2.8.2"
 features = ["tokio-runtime"]
+
+[[bin]]
+name = "producer"
+path = "src/bin/producer.rs"
+
+[[bin]]
+name = "consumer"
+path = "src/bin/consumer.rs"
+
+[lib]
+name = "boom"
+path = "src/lib.rs"
+test = true
+doctest = true
+bench = true

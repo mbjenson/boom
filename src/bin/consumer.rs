@@ -2,10 +2,11 @@ use apache_avro::from_value;
 use apache_avro::Reader;
 use std::io::BufReader;
 
-mod rabbitmq;
-mod structs;
-mod database;
-mod utils;
+extern crate boom;
+
+use boom::rabbitmq;
+use boom::structs;
+use boom::database;
 
 async fn process_record(record: apache_avro::types::Value) {
     let alert_packet: structs::AlertPacket = from_value(&record).unwrap();
@@ -64,8 +65,8 @@ async fn callback(content: Vec<u8>) -> Result<(), Box<dyn std::error::Error>> {
 }
 #[tokio::main(flavor = "multi_thread", worker_threads = 1)]
 async fn main() {
-    let uri = "amqp://localhost:5672";
-    let connection = rabbitmq::connect(uri).await;
+    let uri = rabbitmq::get_uri();
+    let connection = rabbitmq::connect(&uri).await;
     let channel = rabbitmq::create_channel(&connection).await;
     rabbitmq::declare_queue(&channel, "queue_test").await;
 
