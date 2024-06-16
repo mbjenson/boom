@@ -1,9 +1,9 @@
-use std::future::Future;
 use lapin::{
     options::{BasicPublishOptions, QueueDeclareOptions},
     types::FieldTable,
     BasicProperties, Connection, ConnectionProperties,
 };
+use std::future::Future;
 use tokio_stream::StreamExt;
 
 pub async fn connect(uri: &str) -> Connection {
@@ -69,22 +69,25 @@ pub async fn create_consumer(channel: &lapin::Channel, queue_name: &str) -> lapi
 
 // next is a function that takes a consumer + a callback function to run on each message
 // the callback is an async function that returns a Result type
-pub async fn consume<F, Fut>(consumer: &mut lapin::Consumer, callback: F, max_messages: Option<usize>)
-where
+pub async fn consume<F, Fut>(
+    consumer: &mut lapin::Consumer,
+    callback: F,
+    max_messages: Option<usize>,
+) where
     F: Fn(Vec<u8>) -> Fut,
     Fut: Future<Output = Result<(), Box<dyn std::error::Error>>> + 'static,
 {
-    let should_continue = true;
+    let mut should_continue = true;
     let mut message_count = 0;
 
     while should_continue {
         if let Some(max) = max_messages {
             if message_count >= max {
-                break;
+                should_continue = false;
             }
         }
 
-    match consumer.next().await {
+        match consumer.next().await {
             Some(Ok(delivery)) => {
                 let content = delivery.data.clone();
                 if let Err(e) = callback(content).await {
@@ -106,7 +109,7 @@ where
                 println!("No more messages in queue. Exiting consumer loop.");
                 break;
             }
-    }
+        }
     }
 }
 
@@ -116,7 +119,6 @@ pub fn get_uri() -> String {
     let port = std::env::var("RABBITMQ_PORT").unwrap_or_else(|_| "5672".to_string());
     format!("amqp://{}:{}", host, port)
 }
-
 
 // add a basic test to check if we can publish and consume a message
 #[tokio::test]
@@ -136,7 +138,7 @@ async fn test_publish_consume() {
         .ack(lapin::options::BasicAckOptions::default())
         .await
         .expect("basic_ack");
-    
+
     assert_eq!(delivery.data, message);
 
     // close the channel and connection

@@ -38,6 +38,15 @@ jobs:
         pip install pip==24.0
         pip install -r requirements.txt
 
+    - name: Install Rust
+      uses: actions-rust-lang/setup-rust-toolchain@v1
+
+    - name: Formatting and linting checks
+      if: github.ref != 'refs/heads/main'
+      run: |                                                    
+        pip install pre-commit
+        pre-commit run --from-ref ${{ github.event.pull_request.base.sha }} --to-ref ${{ github.event.pull_request.head.sha }}
+
     - name: Start MongoDB
       uses: supercharge/mongodb-github-action@1.11.0
       with:
@@ -56,9 +65,6 @@ jobs:
       env:
         RABBITMQ_HOST: 127.0.0.1
         RABBITMQ_PORT: ${{ job.services.rabbitmq.ports['5672'] }}
-
-    - name: Install Rust
-      uses: actions-rust-lang/setup-rust-toolchain@v1
 
     - name: Build
       run: cargo build --verbose

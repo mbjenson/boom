@@ -1,13 +1,13 @@
 use apache_avro::from_value;
 use apache_avro::Reader;
-use std::io::BufReader;
 use std::env;
+use std::io::BufReader;
 
 extern crate boom;
 
+use boom::database;
 use boom::rabbitmq;
 use boom::structs;
-use boom::database;
 
 async fn process_record(record: apache_avro::types::Value) {
     let alert_packet: structs::AlertPacket = from_value(&record).unwrap();
@@ -16,14 +16,17 @@ async fn process_record(record: apache_avro::types::Value) {
         return;
     }
     // print the objectId and candid of the alert
-    println!("Processing objectId: {}, candid: {}", alert_packet.objectId, alert_packet.candid);
+    println!(
+        "Processing objectId: {}, candid: {}",
+        alert_packet.objectId, alert_packet.candid
+    );
 
     let coordinates = alert_packet.get_coordinates();
 
     let alert = structs::AlertWithCoords {
         schemavsn: alert_packet.schemavsn.clone(),
         publisher: alert_packet.publisher.clone(),
-        candid: alert_packet.candid.clone(),
+        candid: alert_packet.candid,
         objectId: alert_packet.objectId.clone(),
         candidate: alert_packet.candidate.clone(),
         cutoutScience: alert_packet.cutoutScience.clone(),
@@ -42,7 +45,7 @@ async fn process_record(record: apache_avro::types::Value) {
     } else {
         let alert_aux = structs::AlertAux {
             _id: alert_packet.objectId.clone(),
-            prv_candidates: prv_candidates,
+            prv_candidates,
         };
         database::save_alert_aux(alert_aux).await;
     }
