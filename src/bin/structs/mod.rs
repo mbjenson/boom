@@ -2,6 +2,8 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::utils::{deg2dms, deg2hms, radec2lb};
+
 // schema: https://zwickytransientfacility.github.io/ztf-avro-alert/schema.html
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(untagged)]
@@ -143,6 +145,32 @@ pub struct Cutout {
     pub stampData: Vec<u8>,
 }
 
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct AlertAux {
+    pub _id: String,
+    pub prv_candidates: Vec<Detection>,
+    // pub cross_matches: AlertCrossmatches,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct GeoJSONCoordinates {
+    pub r#type: String, // "Point"
+    pub coordinates: (f64, f64),
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct GalacticCoordinates {
+    pub l: f64,
+    pub b: f64,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct AlertCoordinates {
+    pub radec_str: (String, String),
+    pub radec_geojson: GeoJSONCoordinates,
+    pub galactic: GalacticCoordinates,
+}
+
 #[serde_with::skip_serializing_none]
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Alert {
@@ -171,4 +199,52 @@ pub struct AlertPacket {
     pub cutoutDifference: Cutout,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub prv_candidates: Vec<Detection>,
+}
+
+impl AlertPacket {
+    // this method is used to remove the prv_candidates from the alert
+    // we basically recreate the alert without the prv_candidates
+    // taking advantage of serde's skip_serializing_if = "Vec::is_empty"
+    // to not serialize the prv_candidates if it's empty
+    // pub fn remove_prv_candidates(&self) -> AlertPacket {
+    //     let mut alert = self.clone();
+    //     alert.prv_candidates = vec![];
+    //     alert
+    // }
+
+    // we have a method that generates the AlertCoordinates from the AlertPacket
+    pub fn get_coordinates(&self) -> AlertCoordinates {
+        let ra = self.candidate.detection.ra.unwrap();
+        let dec = self.candidate.detection.dec.unwrap();
+        let lb = radec2lb(ra, dec);
+        let alert_coordinates = AlertCoordinates {
+            // radec_str is a tuple of strings
+            // we use the deg2hms and deg2dms functions to convert the ra and dec to hms and dms
+            // we then create a vector with the two strings
+            radec_str: (deg2hms(ra), deg2dms(dec)),
+            radec_geojson: GeoJSONCoordinates {
+                r#type: "Point".to_string(),
+                coordinates: (ra - 180.0, dec),
+            },
+            galactic: GalacticCoordinates { l: lb.0, b: lb.1 },
+        };
+        alert_coordinates
+    }
+}
+
+#[serde_with::skip_serializing_none]
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct AlertWithCoords {
+    pub schemavsn: String,
+    pub publisher: String,
+    pub objectId: String,
+    pub candid: i64,
+    pub candidate: Candidate,
+    //#[serde(skip_serializing_if = "Vec::is_empty")]
+    //fp_hists: Vec<FpHist>, //TODO: implement this
+    pub cutoutScience: Cutout,
+    pub cutoutTemplate: Cutout,
+    pub cutoutDifference: Cutout,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub coordinates: Option<AlertCoordinates>,
 }

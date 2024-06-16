@@ -88,6 +88,6 @@ async fn main() {
             &msg,
         )
         .await;
-        tokio::time::sleep(tokio::time::Duration::from_millis(1)).await;
+        tokio::time::sleep(tokio::time::Duration::from_millis(1000)).await;
     }
 }
