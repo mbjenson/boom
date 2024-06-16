@@ -7,6 +7,7 @@ from glob import glob
 
 import fastavro
 import pika
+
 from utils import Mongo, alert_mongify, format_fp_hists
 
 mongo = Mongo(db="alerts")
