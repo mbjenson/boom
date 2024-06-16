@@ -29,3 +29,10 @@ path = "src/bin/producer.rs"
 [[bin]]
 name = "consumer"
 path = "src/bin/consumer.rs"
+
+[lib]
+name = "boom"
+path = "src/lib.rs"
+test = true
+doctest = true
+bench = true

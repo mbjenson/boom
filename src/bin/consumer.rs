@@ -65,8 +65,8 @@ async fn callback(content: Vec<u8>) -> Result<(), Box<dyn std::error::Error>> {
 }
 #[tokio::main(flavor = "multi_thread", worker_threads = 1)]
 async fn main() {
-    let uri = "amqp://localhost:5672";
-    let connection = rabbitmq::connect(uri).await;
+    let uri = rabbitmq::get_uri();
+    let connection = rabbitmq::connect(&uri).await;
     let channel = rabbitmq::create_channel(&connection).await;
     rabbitmq::declare_queue(&channel, "queue_test").await;
 
