@@ -16,6 +16,7 @@ tokio = "1.38.0"
 tokio-executor-trait = "2.1.1"
 tokio-reactor-trait = "1.1.0"
 tokio-stream = "0.1.15"
+uuid = "1.8.0"
 
 [dependencies.mongodb]
 version = "2.8.2"
