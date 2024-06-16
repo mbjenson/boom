@@ -7,8 +7,7 @@ use crate::structs::{AlertAux, AlertWithCoords, Detection};
 async fn connect_mongodb() -> Database {
     let client_options = ClientOptions::parse("mongodb://localhost:27017").await.unwrap();
     let client = Client::with_options(client_options).unwrap();
-    let db = client.database("boom");
-    db
+    client.database("boom")
 }
 
 pub async fn alert_exists(candid: i64) -> bool {
@@ -16,7 +15,7 @@ pub async fn alert_exists(candid: i64) -> bool {
     let collection: Collection<AlertWithCoords> = db.collection("ztf_alerts");
     let result = collection.count_documents(
         mongodb::bson::doc! {
-            "candid": candid.clone()
+            "candid": candid,
         },
         None,
     ).await.unwrap();

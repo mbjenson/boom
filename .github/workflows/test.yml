@@ -49,7 +49,7 @@ jobs:
       run: |
         curl http://localhost:27017
 
-    - name: Check rabbitmq is up
+    - name: mongodb / rabbitmq python tests
       run: |
         python tests/send.py
         python tests/receive.py
@@ -63,9 +63,17 @@ jobs:
     - name: Build
       run: cargo build --verbose
 
-    - name: Run tests
+    - name: Run cargo tests
       run: |
         cargo test --verbose
+      env:
+        RABBITMQ_HOST: 127.0.0.1
+        RABBITMQ_PORT: ${{ job.services.rabbitmq.ports['5672'] }}
+
+    - name: mongodb / rabbitmq rust tests
+      run: |
+        cargo run --bin producer
+        cargo run --bin consumer 24
       env:
         RABBITMQ_HOST: 127.0.0.1
         RABBITMQ_PORT: ${{ job.services.rabbitmq.ports['5672'] }}

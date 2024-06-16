@@ -1,6 +1,7 @@
 use apache_avro::from_value;
 use apache_avro::Reader;
 use std::io::BufReader;
+use std::env;
 
 extern crate boom;
 
@@ -72,5 +73,19 @@ async fn main() {
 
     let mut consumer = rabbitmq::create_consumer(&channel, "queue_test").await;
 
-    rabbitmq::consume(&mut consumer, callback).await;
+    let args: Vec<String> = env::args().collect();
+    let max_messages: Option<usize> = args.get(1).and_then(|s| s.parse().ok());
+
+    match max_messages {
+        Some(value) => println!("Max messages to consume: {}", value),
+        None => println!("Max messages to consume: None"),
+    }
+
+    let max_messages = if max_messages.is_some() {
+        Some(max_messages.unwrap())
+    } else {
+        None
+    };
+
+    rabbitmq::consume(&mut consumer, callback, max_messages).await;
 }

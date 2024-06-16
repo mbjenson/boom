@@ -1,5 +1,4 @@
 use std::future::Future;
-
 use lapin::{
     options::{BasicPublishOptions, QueueDeclareOptions},
     types::FieldTable,
@@ -70,20 +69,44 @@ pub async fn create_consumer(channel: &lapin::Channel, queue_name: &str) -> lapi
 
 // next is a function that takes a consumer + a callback function to run on each message
 // the callback is an async function that returns a Result type
-pub async fn consume<F, Fut>(consumer: &mut lapin::Consumer, callback: F)
+pub async fn consume<F, Fut>(consumer: &mut lapin::Consumer, callback: F, max_messages: Option<usize>)
 where
     F: Fn(Vec<u8>) -> Fut,
     Fut: Future<Output = Result<(), Box<dyn std::error::Error>>> + 'static,
 {
-    while let Some(delivery) = consumer.next().await {
-        if let Ok(delivery) = delivery {
-            let content = delivery.data.clone();
-            callback(content).await.unwrap();
-            delivery
-                .ack(lapin::options::BasicAckOptions::default())
-                .await
-                .expect("basic_ack");
+    let should_continue = true;
+    let mut message_count = 0;
+
+    while should_continue {
+        if let Some(max) = max_messages {
+            if message_count >= max {
+                break;
+            }
         }
+
+    match consumer.next().await {
+            Some(Ok(delivery)) => {
+                let content = delivery.data.clone();
+                if let Err(e) = callback(content).await {
+                    eprintln!("Error processing message: {:?}", e);
+                } else {
+                    if let Err(e) = delivery
+                        .ack(lapin::options::BasicAckOptions::default())
+                        .await
+                    {
+                        eprintln!("Failed to ack delivery: {:?}", e);
+                    }
+                    message_count += 1;
+                }
+            }
+            Some(Err(e)) => {
+                eprintln!("Error receiving delivery: {:?}", e);
+            }
+            None => {
+                println!("No more messages in queue. Exiting consumer loop.");
+                break;
+            }
+    }
     }
 }
 

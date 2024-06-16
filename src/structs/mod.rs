@@ -217,7 +217,7 @@ impl AlertPacket {
         let ra = self.candidate.detection.ra.unwrap();
         let dec = self.candidate.detection.dec.unwrap();
         let lb = radec2lb(ra, dec);
-        let alert_coordinates = AlertCoordinates {
+        AlertCoordinates {
             // radec_str is a tuple of strings
             // we use the deg2hms and deg2dms functions to convert the ra and dec to hms and dms
             // we then create a vector with the two strings
@@ -227,8 +227,7 @@ impl AlertPacket {
                 coordinates: (ra - 180.0, dec),
             },
             galactic: GalacticCoordinates { l: lb.0, b: lb.1 },
-        };
-        alert_coordinates
+        }
     }
 }
 
