@@ -1,4 +1,6 @@
-mod rabbitmq;
+extern crate boom;
+
+use boom::rabbitmq;
 
 #[tokio::main]
 async fn main() {
@@ -16,6 +18,4 @@ async fn main() {
         println!("Sent message: {}", i);
         i += 1;
     }
-
-        
 }

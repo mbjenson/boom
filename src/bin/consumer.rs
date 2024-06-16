@@ -2,10 +2,11 @@ use apache_avro::from_value;
 use apache_avro::Reader;
 use std::io::BufReader;
 
-mod rabbitmq;
-mod structs;
-mod database;
-mod utils;
+extern crate boom;
+
+use boom::rabbitmq;
+use boom::structs;
+use boom::database;
 
 async fn process_record(record: apache_avro::types::Value) {
     let alert_packet: structs::AlertPacket = from_value(&record).unwrap();
