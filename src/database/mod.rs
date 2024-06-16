@@ -14,7 +14,7 @@ async fn connect_mongodb() -> Database {
 
 pub async fn alert_exists(candid: i64) -> bool {
     let db = connect_mongodb().await;
-    let collection: Collection<AlertWithCoords> = db.collection("ztf_alerts");
+    let collection: Collection<AlertWithCoords> = db.collection("alerts");
     let result = collection
         .count_documents(
             mongodb::bson::doc! {
@@ -29,7 +29,7 @@ pub async fn alert_exists(candid: i64) -> bool {
 
 pub async fn alert_aux_exists(object_id: &str) -> bool {
     let db = connect_mongodb().await;
-    let collection: Collection<Value> = db.collection("ztf_alerts_aux");
+    let collection: Collection<Value> = db.collection("alerts_aux");
     let result = collection
         .count_documents(
             mongodb::bson::doc! {
@@ -44,13 +44,13 @@ pub async fn alert_aux_exists(object_id: &str) -> bool {
 
 pub async fn save_alert(alert: &AlertWithCoords) {
     let db = connect_mongodb().await;
-    let collection: Collection<AlertWithCoords> = db.collection("ztf_alerts");
+    let collection: Collection<AlertWithCoords> = db.collection("alerts");
     collection.insert_one(alert.clone(), None).await.unwrap();
 }
 
 pub async fn save_alert_aux(alert_aux: AlertAux) {
     let db = connect_mongodb().await;
-    let collection: Collection<AlertAux> = db.collection("ztf_alerts_aux");
+    let collection: Collection<AlertAux> = db.collection("alerts_aux");
     collection
         .insert_one(alert_aux.clone(), None)
         .await
@@ -63,7 +63,7 @@ pub async fn update_alert_aux(object_id: &str, prv_candidates: Vec<Detection>) {
         .map(|x| mongodb::bson::to_document(x).unwrap())
         .collect();
     let db = connect_mongodb().await;
-    let collection: Collection<Value> = db.collection("ztf_alerts_aux");
+    let collection: Collection<Value> = db.collection("alerts_aux");
     collection
         .update_one(
             mongodb::bson::doc! {"_id": object_id},

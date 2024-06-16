@@ -81,12 +81,6 @@ pub async fn consume<F, Fut>(
     let mut message_count = 0;
 
     while should_continue {
-        if let Some(max) = max_messages {
-            if message_count >= max {
-                should_continue = false;
-            }
-        }
-
         match consumer.next().await {
             Some(Ok(delivery)) => {
                 let content = delivery.data.clone();
@@ -108,6 +102,12 @@ pub async fn consume<F, Fut>(
             None => {
                 println!("No more messages in queue. Exiting consumer loop.");
                 break;
+            }
+        }
+
+        if let Some(max) = max_messages {
+            if message_count >= max {
+                should_continue = false;
             }
         }
     }
