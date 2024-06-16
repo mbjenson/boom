@@ -2,9 +2,9 @@ name: rabbitmq and mongo
                                                                                 
 on:                                                                             
   push:
-    branches: [ "main" ]
+    branches:
+      - main
   pull_request:
-    branches: [ "main" ]
 
 jobs:
   build:
