@@ -72,9 +72,9 @@ async fn main() {
     let uri = rabbitmq::get_uri();
     let connection = rabbitmq::connect(&uri).await;
     let channel = rabbitmq::create_channel(&connection).await;
-    rabbitmq::declare_queue(&channel, "queue_test").await;
+    rabbitmq::declare_queue(&channel, "ztf_alerts").await;
 
-    let mut consumer = rabbitmq::create_consumer(&channel, "queue_test").await;
+    let mut consumer = rabbitmq::create_consumer(&channel, "ztf_alerts").await;
 
     let args: Vec<String> = env::args().collect();
     let max_messages: Option<usize> = args.get(1).and_then(|s| s.parse().ok());
@@ -90,5 +90,11 @@ async fn main() {
         None
     };
 
-    rabbitmq::consume(&mut consumer, callback, max_messages).await;
+    if let Some(max) = max_messages {
+        println!("Consuming up to {} messages", max);
+        rabbitmq::consume_with_max(&mut consumer, callback, Some(max)).await;
+    } else {
+        println!("Consuming all messages");
+        rabbitmq::consume(&mut consumer, callback).await;
+    }
 }

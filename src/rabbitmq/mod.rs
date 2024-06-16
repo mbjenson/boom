@@ -67,9 +67,7 @@ pub async fn create_consumer(channel: &lapin::Channel, queue_name: &str) -> lapi
         .unwrap()
 }
 
-// next is a function that takes a consumer + a callback function to run on each message
-// the callback is an async function that returns a Result type
-pub async fn consume<F, Fut>(
+pub async fn consume_with_max<F, Fut>(
     consumer: &mut lapin::Consumer,
     callback: F,
     max_messages: Option<usize>,
@@ -86,15 +84,14 @@ pub async fn consume<F, Fut>(
                 let content = delivery.data.clone();
                 if let Err(e) = callback(content).await {
                     eprintln!("Error processing message: {:?}", e);
-                } else {
-                    if let Err(e) = delivery
-                        .ack(lapin::options::BasicAckOptions::default())
-                        .await
-                    {
-                        eprintln!("Failed to ack delivery: {:?}", e);
-                    }
-                    message_count += 1;
+                    // do not acknowledge the message and continue
+                } else if let Err(e) = delivery
+                    .ack(lapin::options::BasicAckOptions::default())
+                    .await
+                {
+                    eprintln!("Failed to ack delivery: {:?}", e);
                 }
+                message_count += 1;
             }
             Some(Err(e)) => {
                 eprintln!("Error receiving delivery: {:?}", e);
@@ -113,6 +110,38 @@ pub async fn consume<F, Fut>(
     }
 }
 
+pub async fn consume<F, Fut>(consumer: &mut lapin::Consumer, callback: F)
+where
+    F: Fn(Vec<u8>) -> Fut,
+    Fut: Future<Output = Result<(), Box<dyn std::error::Error>>> + 'static,
+{
+    loop {
+        match consumer.next().await {
+            Some(Ok(delivery)) => {
+                let content = delivery.data.clone();
+                if let Err(e) = callback(content).await {
+                    if e.to_string() == "Received exit message" {
+                        println!("Received exit message. Exiting consumer loop.");
+                        break;
+                    }
+                    eprintln!("Error processing message: {:?}", e);
+                } else if let Err(e) = delivery
+                    .ack(lapin::options::BasicAckOptions::default())
+                    .await
+                {
+                    eprintln!("Failed to ack delivery: {:?}", e);
+                }
+            }
+            Some(Err(e)) => {
+                eprintln!("Error receiving delivery: {:?}", e);
+            }
+            None => {
+                println!("No more messages in queue. Exiting consumer loop.");
+            }
+        }
+    }
+}
+
 // this function creates the uri based on the host and port if provided as env variables
 pub fn get_uri() -> String {
     let host = std::env::var("RABBITMQ_HOST").unwrap_or_else(|_| "localhost".to_string());
@@ -123,23 +152,40 @@ pub fn get_uri() -> String {
 // add a basic test to check if we can publish and consume a message
 #[tokio::test]
 async fn test_publish_consume() {
+    // create a random queue name with a uuid
+    let queue_name = format!("queue_test_{}", uuid::Uuid::new_v4());
     let uri = get_uri();
     let connection = connect(&uri).await;
     let channel = create_channel(&connection).await;
-    declare_queue(&channel, "queue_test").await;
+    declare_queue(&channel, &queue_name).await;
 
     let message = b"Hello, world!";
-    publish_message(&channel, "", "queue_test", message).await;
+    publish_message(&channel, "", &queue_name, message).await;
 
-    let mut consumer = create_consumer(&channel, "queue_test").await;
+    let mut consumer = create_consumer(&channel, &queue_name).await;
 
-    let delivery = consumer.next().await.unwrap().unwrap();
-    delivery
-        .ack(lapin::options::BasicAckOptions::default())
-        .await
-        .expect("basic_ack");
+    consume_with_max(
+        &mut consumer,
+        |content| async move {
+            assert_eq!(content, message.to_vec());
+            Ok(())
+        },
+        Some(1),
+    )
+    .await;
 
-    assert_eq!(delivery.data, message);
+    // this is somewhat of a hack, but to test the consume function which is an infinite loop
+    // we send 2 messages, one hello word and one goodbye world, that the callback will check
+    // and then we close the connection to break the loop
+    let exit_message = b"Goodbye, world!";
+    publish_message(&channel, "", &queue_name, exit_message).await;
+
+    consume(&mut consumer, |content| async move {
+        println!("Received message: {:?}", content);
+        assert_eq!(content, exit_message.to_vec());
+        Err("Received exit message".into())
+    })
+    .await;
 
     // close the channel and connection
     channel.close(200, "Bye").await.unwrap();
