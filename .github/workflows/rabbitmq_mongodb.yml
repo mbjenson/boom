@@ -45,7 +45,11 @@ jobs:
         mongodb-db: test
         mongodb-port: 27017
 
-    - name: Run Tests
+    - name: Check MongoDB is up
+      run: |
+        curl http://localhost:27017
+
+    - name: Check rabbitmq is up
       run: |
         python tests/send.py
         python tests/receive.py
