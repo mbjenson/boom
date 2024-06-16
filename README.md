@@ -11,5 +11,6 @@
 3. In yet another terminal, run `cargo run --bin consumer`. This will spawn one consumer that will read from the queue and print the candid + objectId of the alert.
 
 ##### TODOs:
+- [ ] Add unit tests, which requires to have rabbitmq installed (and later mongodb) in a github workflow.
 - [ ] Have each worker process the alert and push them to mongo.
 - [ ] Write a `babysitter` process that given a min and max number of workers, will add/remove workers based on the "load", here being the number of alerts pending in the rabbitmq queue.
