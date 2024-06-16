@@ -1,8 +1,18 @@
 #!/usr/bin/env python
-import pika, sys, os
+import os
+import sys
+import pika
+
+host = os.getenv('RABBITMQ_HOST', 'localhost')
+port = os.getenv('RABBITMQ_PORT', 5672)
 
 def main():
-    connection = pika.BlockingConnection(pika.ConnectionParameters(host='localhost'))
+    connection = pika.BlockingConnection(
+        pika.ConnectionParameters(
+            host=host,
+            port=port
+        )
+    )
     channel = connection.channel()
 
     channel.queue_declare(queue='hello')
