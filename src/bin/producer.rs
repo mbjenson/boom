@@ -27,7 +27,7 @@ async fn main() {
 
     // find the list of files in the data directory
     // let files = std::fs::read_dir("data/ztf_public_20240611").unwrap();
-    let files = std::fs::read_dir("data/alerts").unwrap();
+    let mut files = std::fs::read_dir("data/ztf_alerts").unwrap();
     let mut i = 0;
     for f in files {
         let f = f.unwrap();

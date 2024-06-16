@@ -1,5 +1,5 @@
 use lapin::{
-    message::DeliveryResult,
+    // message::DeliveryResult,
     options::{BasicAckOptions, BasicConsumeOptions, QueueDeclareOptions},
     types::FieldTable,
     Connection, ConnectionProperties,
@@ -7,6 +7,7 @@ use lapin::{
 use apache_avro::from_value;
 use apache_avro::Reader;
 use std::io::BufReader;
+use tokio_stream::StreamExt;
 
 mod structs;
 mod database;
@@ -57,7 +58,7 @@ async fn process_record(record: apache_avro::types::Value) {
     // println!("Processed alert: {}", alert_packet.candid);
 }
 
-#[tokio::main]
+#[tokio::main(flavor = "multi_thread", worker_threads = 1)]
 async fn main() {
     let uri = "amqp://localhost:5672";
     let options = ConnectionProperties::default()
@@ -78,7 +79,9 @@ async fn main() {
         .await
         .unwrap();
 
-    let consumer = channel
+    channel.basic_qos(1, Default::default()).await.unwrap();
+
+    let mut consumer = channel
         .basic_consume(
             "queue_test",
             "tag_foo",
@@ -88,37 +91,55 @@ async fn main() {
         .await
         .unwrap();
 
-    consumer.set_delegate(move |delivery: DeliveryResult| async move {
-        let delivery = match delivery {
-            // Carries the delivery alongside its channel
-            Ok(Some(delivery)) => {
-                let content = delivery.data.clone();
-                let reader = Reader::new(BufReader::new(&content[..])).unwrap();
-                for record in reader {
-                    let record = record.unwrap();
-                    // we can now process the alert
-                    process_record(record).await;
-                }
-                delivery
+    while let Some(delivery) = consumer.next().await {
+        if let Ok(delivery) = delivery {
+            let content = delivery.data.clone();
+            let reader = Reader::new(BufReader::new(&content[..])).unwrap();
+            for record in reader {
+                let record = record.unwrap();
+                // we can now process the alert
+                process_record(record).await;
             }
-            // The consumer got canceled
-            Ok(None) => return,
-            // Carries the error and is always followed by Ok(None)
-            Err(error) => {
-                dbg!("Failed to consume queue message {}", error);
-                return;
-            }
-        };
-
-        // Do something with the delivery data (The message payload)
-
-        delivery
-            .ack(BasicAckOptions::default())
-            .await
-            .expect("Failed to ack send_webhook_event message");
-    });
-
-    loop {
-        tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+            delivery
+                .ack(BasicAckOptions::default())
+                .await
+                .expect("basic_ack");
+        }
     }
+
+    // THE CODE UNDERNEATH LETS TOKIO SPAWN A NEW THREAD FOR EACH MESSAGE RECEIVED
+    // UNTIL WE CAN SET A MAX NB OF THREADS, WE WILL USE THE ABOVE CODE
+    // THAT IS SINGLE THREADED, SO WE CAN JUST START MULTIPLE INSTANCES OF THE CONSUMER
+    // TO SCALE UP
+    // consumer.set_delegate(move |delivery: DeliveryResult| async move {
+    //     let delivery = match delivery {
+    //         // Carries the delivery alongside its channel
+    //         Ok(Some(delivery)) => {
+    //             // add a 2 seconds sleep to simulate processing time
+    //             tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+    //             let content = delivery.data.clone();
+    //             let reader = Reader::new(BufReader::new(&content[..])).unwrap();
+    //             for record in reader {
+    //                 let record = record.unwrap();
+    //                 // we can now process the alert
+    //                 process_record(record).await;
+    //             }
+    //             delivery
+    //         }
+    //         // The consumer got canceled
+    //         Ok(None) => return,
+    //         // Carries the error and is always followed by Ok(None)
+    //         Err(error) => {
+    //             dbg!("Failed to consume queue message {}", error);
+    //             return;
+    //         }
+    //     };
+
+    //     // Do something with the delivery data (The message payload)
+
+    //     delivery
+    //         .ack(BasicAckOptions::default())
+    //         .await
+    //         .expect("Failed to ack send_webhook_event message");
+    // });
 }
