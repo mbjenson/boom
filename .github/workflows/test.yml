@@ -1,4 +1,4 @@
-name: rabbitmq and mongo
+name: Tests
                                                                                 
 on:                                                                             
   push:
