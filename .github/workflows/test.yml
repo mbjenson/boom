@@ -1,4 +1,4 @@
-name: rabbitmq and mongo
+name: Tests
                                                                                 
 on:                                                                             
   push:
@@ -53,6 +53,19 @@ jobs:
       run: |
         python tests/send.py
         python tests/receive.py
+      env:
+        RABBITMQ_HOST: 127.0.0.1
+        RABBITMQ_PORT: ${{ job.services.rabbitmq.ports['5672'] }}
+
+    - name: Install Rust
+      uses: actions-rust-lang/setup-rust-toolchain@v1
+
+    - name: Build
+      run: cargo build --verbose
+
+    - name: Run tests
+      run: |
+        cargo test --verbose
       env:
         RABBITMQ_HOST: 127.0.0.1
         RABBITMQ_PORT: ${{ job.services.rabbitmq.ports['5672'] }}

@@ -1,9 +1,11 @@
-mod rabbitmq;
+extern crate boom;
+
+use boom::rabbitmq;
 
 #[tokio::main]
 async fn main() {
-    let uri = "amqp://localhost:5672";
-    let connection = rabbitmq::connect(uri).await;
+    let uri = rabbitmq::get_uri();
+    let connection = rabbitmq::connect(&uri).await;
     let channel = rabbitmq::create_channel(&connection).await;
     rabbitmq::declare_queue(&channel, "queue_test").await;
 
@@ -16,6 +18,4 @@ async fn main() {
         println!("Sent message: {}", i);
         i += 1;
     }
-
-        
 }

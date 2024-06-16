@@ -86,3 +86,37 @@ where
         }
     }
 }
+
+// this function creates the uri based on the host and port if provided as env variables
+pub fn get_uri() -> String {
+    let host = std::env::var("RABBITMQ_HOST").unwrap_or_else(|_| "localhost".to_string());
+    let port = std::env::var("RABBITMQ_PORT").unwrap_or_else(|_| "5672".to_string());
+    format!("amqp://{}:{}", host, port)
+}
+
+
+// add a basic test to check if we can publish and consume a message
+#[tokio::test]
+async fn test_publish_consume() {
+    let uri = get_uri();
+    let connection = connect(&uri).await;
+    let channel = create_channel(&connection).await;
+    declare_queue(&channel, "queue_test").await;
+
+    let message = b"Hello, world!";
+    publish_message(&channel, "", "queue_test", message).await;
+
+    let mut consumer = create_consumer(&channel, "queue_test").await;
+
+    let delivery = consumer.next().await.unwrap().unwrap();
+    delivery
+        .ack(lapin::options::BasicAckOptions::default())
+        .await
+        .expect("basic_ack");
+    
+    assert_eq!(delivery.data, message);
+
+    // close the channel and connection
+    channel.close(200, "Bye").await.unwrap();
+    connection.close(200, "Good Bye").await.unwrap();
+}
