@@ -84,15 +84,14 @@ pub async fn consume_with_max<F, Fut>(
                 let content = delivery.data.clone();
                 if let Err(e) = callback(content).await {
                     eprintln!("Error processing message: {:?}", e);
-                } else {
-                    if let Err(e) = delivery
-                        .ack(lapin::options::BasicAckOptions::default())
-                        .await
-                    {
-                        eprintln!("Failed to ack delivery: {:?}", e);
-                    }
-                    message_count += 1;
+                    // do not acknowledge the message and continue
+                } else if let Err(e) = delivery
+                    .ack(lapin::options::BasicAckOptions::default())
+                    .await
+                {
+                    eprintln!("Failed to ack delivery: {:?}", e);
                 }
+                message_count += 1;
             }
             Some(Err(e)) => {
                 eprintln!("Error receiving delivery: {:?}", e);
@@ -111,10 +110,8 @@ pub async fn consume_with_max<F, Fut>(
     }
 }
 
-pub async fn consume<F, Fut>(
-    consumer: &mut lapin::Consumer,
-    callback: F,
-) where
+pub async fn consume<F, Fut>(consumer: &mut lapin::Consumer, callback: F)
+where
     F: Fn(Vec<u8>) -> Fut,
     Fut: Future<Output = Result<(), Box<dyn std::error::Error>>> + 'static,
 {
@@ -128,13 +125,11 @@ pub async fn consume<F, Fut>(
                         break;
                     }
                     eprintln!("Error processing message: {:?}", e);
-                } else {
-                    if let Err(e) = delivery
-                        .ack(lapin::options::BasicAckOptions::default())
-                        .await
-                    {
-                        eprintln!("Failed to ack delivery: {:?}", e);
-                    }
+                } else if let Err(e) = delivery
+                    .ack(lapin::options::BasicAckOptions::default())
+                    .await
+                {
+                    eprintln!("Failed to ack delivery: {:?}", e);
                 }
             }
             Some(Err(e)) => {
@@ -142,7 +137,6 @@ pub async fn consume<F, Fut>(
             }
             None => {
                 println!("No more messages in queue. Exiting consumer loop.");
-
             }
         }
     }
@@ -170,10 +164,15 @@ async fn test_publish_consume() {
 
     let mut consumer = create_consumer(&channel, &queue_name).await;
 
-    consume_with_max(&mut consumer, |content| async move {
-        assert_eq!(content, message.to_vec());
-        Ok(())
-    }, Some(1)).await;
+    consume_with_max(
+        &mut consumer,
+        |content| async move {
+            assert_eq!(content, message.to_vec());
+            Ok(())
+        },
+        Some(1),
+    )
+    .await;
 
     // this is somewhat of a hack, but to test the consume function which is an infinite loop
     // we send 2 messages, one hello word and one goodbye world, that the callback will check
@@ -183,13 +182,10 @@ async fn test_publish_consume() {
 
     consume(&mut consumer, |content| async move {
         println!("Received message: {:?}", content);
-        if content == exit_message.to_vec() {
-            Err("Received exit message".into())
-        } else {
-            assert!(false);
-            Ok(())
-        }
-    }).await;
+        assert_eq!(content, exit_message.to_vec());
+        Err("Received exit message".into())
+    })
+    .await;
 
     // close the channel and connection
     channel.close(200, "Bye").await.unwrap();
