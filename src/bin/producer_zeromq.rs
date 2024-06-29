@@ -27,7 +27,6 @@ async fn run_publisher() -> Result<(), zmq::Error> {
     for (i, f) in files.enumerate() {
         let f = f.unwrap();
         let msg = std::fs::read(f.path()).unwrap();
-        let message = "Hello, World!";
         socket.send(&msg, 0)?;
         println!("Sent message: {}", i);
 
