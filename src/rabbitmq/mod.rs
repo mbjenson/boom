@@ -21,12 +21,13 @@ pub async fn create_channel(connection: &Connection) -> lapin::Channel {
 }
 
 pub async fn declare_queue(channel: &lapin::Channel, queue_name: &str) {
+    let queue_options = QueueDeclareOptions {
+        durable: true,
+        ..Default::default()
+    };
+
     channel
-        .queue_declare(
-            queue_name,
-            QueueDeclareOptions::default(),
-            FieldTable::default(),
-        )
+        .queue_declare(queue_name, queue_options, FieldTable::default())
         .await
         .unwrap();
 }
