@@ -9,7 +9,7 @@ use boom::zeromq;
 #[tokio::main]
 async fn main() -> Result<()> {
     let context = Context::new();
-    let mut socket = context.socket(SUB).unwrap();
+    let socket = context.socket(SUB).unwrap();
 
     let uri = zeromq::get_uri();
     socket.connect(&uri).unwrap();
