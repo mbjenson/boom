@@ -11,12 +11,12 @@ const RGE: [[f64; 3]; 3] = [
 pub fn radec2lb(ra: f64, dec: f64) -> (f64, f64) {
     let ra_rad = ra.to_radians();
     let dec_rad = dec.to_radians();
-    let u = vec![
+    let u = [
         ra_rad.cos() * dec_rad.cos(),
         ra_rad.sin() * dec_rad.cos(),
         dec_rad.sin(),
     ];
-    let ug = vec![
+    let ug = [
         RGE[0][0] * u[0] + RGE[0][1] * u[1] + RGE[0][2] * u[2],
         RGE[1][0] * u[0] + RGE[1][1] * u[1] + RGE[1][2] * u[2],
         RGE[2][0] * u[0] + RGE[2][1] * u[1] + RGE[2][2] * u[2],

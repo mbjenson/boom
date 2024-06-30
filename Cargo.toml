@@ -16,7 +16,25 @@ serde_with = "3.8.1"
 tokio = "1.38.0"
 tokio-executor-trait = "2.1.1"
 tokio-reactor-trait = "1.1.0"
+tokio-stream = "0.1.15"
+uuid = "1.8.0"
+zmq = "0.10"
 
 [dependencies.mongodb]
 version = "2.8.2"
 features = ["tokio-runtime"]
+
+[[bin]]
+name = "producer"
+path = "src/bin/producer.rs"
+
+[[bin]]
+name = "consumer"
+path = "src/bin/consumer.rs"
+
+[lib]
+name = "boom"
+path = "src/lib.rs"
+test = true
+doctest = true
+bench = true

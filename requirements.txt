@@ -1,0 +1,8 @@
+fastavro
+motor
+numba
+numpy
+pika
+pyaml
+pymongo
+tqdm
