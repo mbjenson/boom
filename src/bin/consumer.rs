@@ -4,6 +4,7 @@ use lapin::{
     types::FieldTable,
     Connection, ConnectionProperties,
 };
+use futures_lite::stream::StreamExt;
 use apache_avro::from_value;
 use apache_avro::Reader;
 use std::io::BufReader;
@@ -78,7 +79,7 @@ async fn main() {
         .await
         .unwrap();
 
-    let consumer = channel
+    let mut consumer = channel
         .basic_consume(
             "queue_test",
             "tag_foo",
@@ -88,37 +89,51 @@ async fn main() {
         .await
         .unwrap();
 
-    consumer.set_delegate(move |delivery: DeliveryResult| async move {
-        let delivery = match delivery {
-            // Carries the delivery alongside its channel
-            Ok(Some(delivery)) => {
-                let content = delivery.data.clone();
-                let reader = Reader::new(BufReader::new(&content[..])).unwrap();
-                for record in reader {
-                    let record = record.unwrap();
-                    // we can now process the alert
-                    process_record(record).await;
-                }
-                delivery
-            }
-            // The consumer got canceled
-            Ok(None) => return,
-            // Carries the error and is always followed by Ok(None)
-            Err(error) => {
-                dbg!("Failed to consume queue message {}", error);
-                return;
-            }
-        };
+    // consumer.set_delegate() will allow the consumer to spawn processes to handle the messages
+    // TODO: limit the number of concurrent processes that tokin can spawn
+    // otherwise, we process things too fast and can run out of memory
+    // consumer.set_delegate(move |delivery: DeliveryResult| async move {
+    //     let delivery = match delivery {
+    //         // Carries the delivery alongside its channel
+    //         Ok(Some(delivery)) => {
+    //             let content = delivery.data.clone();
+    //             let reader = Reader::new(BufReader::new(&content[..])).unwrap();
+    //             for record in reader {
+    //                 let record = record.unwrap();
+    //                 // we can now process the alert
+    //                 process_record(record).await;
+    //             }
+    //             delivery
+    //         }
+    //         // The consumer got canceled
+    //         Ok(None) => return,
+    //         // Carries the error and is always followed by Ok(None)
+    //         Err(error) => {
+    //             dbg!("Failed to consume queue message {}", error);
+    //             return;
+    //         }
+    //     };
 
-        // Do something with the delivery data (The message payload)
+    //     // Do something with the delivery data (The message payload)
 
+    //     delivery
+    //         .ack(BasicAckOptions::default())
+    //         .await
+    //         .expect("Failed to ack send_webhook_event message");
+    // });
+
+    while let Some(delivery) = consumer.next().await {
+        let delivery = delivery.unwrap();
+        let content = delivery.data.clone();
+        let reader = Reader::new(BufReader::new(&content[..])).unwrap();
+        for record in reader {
+            let record = record.unwrap();
+            // we can now process the alert
+            process_record(record).await;
+        }
         delivery
             .ack(BasicAckOptions::default())
             .await
             .expect("Failed to ack send_webhook_event message");
-    });
-
-    loop {
-        tokio::time::sleep(std::time::Duration::from_secs(1)).await;
     }
 }
