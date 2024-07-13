@@ -11,3 +11,10 @@ cargo run --bin queue
 ```bash
 cargo run --bin worker
 ```
+
+##### Log output
+```bash
+cargo run --bin watch_log <log_file>
+```
+
+where `<log_file>` is the name of the file to read from (e.g. `worker.log`, or `queue.log`). The `.log` extension can be omitted.
