@@ -1,7 +1,6 @@
 #![allow(non_snake_case)]
 #![allow(dead_code)]
 
-// TODO: get connection to local mongodb instance working
 
 
 use std::{
@@ -28,28 +27,11 @@ use apache_avro::{
 };
 
 mod fits;
-// mod ml;
 mod structs;
 mod utils;
 
-// #[tokio::main]
-// async fn main() -> mongodb::error::Result<()> {
-//     // Replace the placeholder with your Atlas connection string
-//     let uri = "<connection string>";
-//     // Create a new client and connect to the server
-//     let client = Client::with_uri_str(uri).await?;
-//     // Get a handle on the movies collection
-//     let database = client.database("sample_mflix");
-//     let my_coll: Collection<Document> = database.collection("movies");
-//     // Find a movie based on the title value
-//     let my_movie = my_coll.find_one(doc! { "title": "The Perils of Pauline" }).await?;
-//     // Print the document
-//     println!("Found a movie:\n{:#?}", my_movie);
-//     Ok(())
-// }
 
-
-// grab the list of all files in the ./data directory
+// grab the list of all files in the ./data/alerts directory
 fn get_files() -> Vec<String> {
     let paths = std::fs::read_dir("./data/alerts/").unwrap();
     let mut files = Vec::new();
@@ -60,6 +42,7 @@ fn get_files() -> Vec<String> {
     }
     files
 }
+
 
 async fn process_files(
     queue: Arc<Mutex<Vec<apache_avro::types::Value>>>,
@@ -303,27 +286,55 @@ async fn worker(queue: Arc<Mutex<Vec<apache_avro::types::Value>>>) -> Result<(),
     Ok(())
 }
 
-// #[tokio::main]
-// async fn main() {
-//     let nb_workers = 10;
-//     let max_queue_length = 1000;
 
-//     // create the alerts queue
-//     let queue = Arc::new(Mutex::new(Vec::new()));
+#[tokio::main]
+async fn main() {
+    let nb_workers = 10;
+    let max_queue_length = 1000;
 
-//     // fire and forget the threaded workers
-//     for _ in 0..nb_workers {
-//         let queue = Arc::clone(&queue);
-//         thread::spawn(move || {
-//             let _ = tokio::runtime::Runtime::new().unwrap().block_on(worker(queue));
-//         });
-//     }
+    // create the alerts queue
+    let queue = Arc::new(Mutex::new(Vec::new()));
 
-//     let now = std::time::Instant::now();
+    // fire and forget the threaded workers
+    for _ in 0..nb_workers {
+        let queue = Arc::clone(&queue);
+        thread::spawn(move || {
+            let _ = tokio::runtime::Runtime::new().unwrap().block_on(worker(queue));
+        });
+    }
 
-//     let _ = process_files(Arc::clone(&queue), max_queue_length).await;
+    let now = std::time::Instant::now();
 
-//     println!("all files processed in {}s, stopping the app", now.elapsed().as_secs_f64());
-// }
+    let _ = process_files(Arc::clone(&queue), max_queue_length).await;
+
+    println!("all files processed in {}s, stopping the app", now.elapsed().as_secs_f64());
+}
 
 // all files processed in 1068.59524525s, stopping the app
+
+
+
+// Test main function for dev purposes
+// #[tokio::main]
+// async fn main() -> mongodb::error::Result<()> {
+//     // Replace the placeholder with your Atlas connection string
+//     let uri = "mongodb://localhost:27017";
+//     // Create a new client and connect to the server
+//     let client = Client::with_uri_str(uri).await?;
+//     // Get a handle on the movies collection
+//     let database = client.database("kowalski");
+//     // let my_coll: Collection<Document> = database.collection("test");
+//     let collection: Collection<Document> = database.collection("people");
+    
+//     let result = collection.find_one(doc! {"name": "Paul"}, None).await?;
+    
+//     collection.insert_one(doc! {"name": "Lewis", "city": "Lancaster"}, None).await?;
+
+//     let result2 = collection.find_one(doc! {"name": "Lewis"}, None).await?;
+    
+
+//     println!("Found the first person:\n{:#?}", result);
+//     println!("Found the second person:\n{:#?}", result2);
+
+//     Ok(())
+// }
