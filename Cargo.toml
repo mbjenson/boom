@@ -30,3 +30,7 @@ features = ["tokio-runtime"]
 [[bin]]
 name = "boom"
 path = "src/main.rs"
+
+[lib]
+name = "boom"
+path = "src/mod.rs"

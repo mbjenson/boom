@@ -7,7 +7,6 @@ use mongodb::{
 };
 use crate::structs;
 
-
 // grab the list of all files from the provided directory
 pub fn get_files(dir_path: String) -> Vec<String> {
     let paths = std::fs::read_dir(dir_path).unwrap();
