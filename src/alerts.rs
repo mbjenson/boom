@@ -1,50 +1,23 @@
-#![allow(non_snake_case)]
-#![allow(dead_code)]
-
-
-
-use std::{
-    sync::Arc,
-    sync::Mutex,
-    thread,
-    error::Error,
-    fs::File,
-    io::BufReader,
-};
+#[allow(non_snake_case)]
 
 use mongodb::{
-    bson::{Document, doc},
     options::ClientOptions, 
     Client, 
     Collection
 };
-
-// here we want to load the alerts from the avro files in the ./data directory
-// we will use the apache-avro crate
+use std::{
+    error::Error, fs::File, io::BufReader, sync::{Arc, Mutex}, thread
+};
 use apache_avro::{
     from_value,
     Reader,
 };
 
-mod fits;
-mod structs;
-mod utils;
+use crate::utils;
+use crate::structs;
 
-
-// grab the list of all files in the ./data/alerts directory
-fn get_files() -> Vec<String> {
-    let paths = std::fs::read_dir("./data/alerts/").unwrap();
-    let mut files = Vec::new();
-    for path in paths {
-        let path = path.unwrap().path();
-        let path = path.to_str().unwrap().to_string();
-        files.push(path);
-    }
-    files
-}
-
-
-async fn process_files(
+// push alerts onto queue which is then given to the workers to process asynchronously
+pub async fn process_files(
     queue: Arc<Mutex<Vec<apache_avro::types::Value>>>,
     max_queue_len: usize,
 ) -> Result<(), Box<dyn Error>> {
@@ -65,13 +38,7 @@ async fn process_files(
     let _ = client.database("kowalski").create_collection("alerts_aux", None).await?;
 
     let mut index = 0 as usize;
-    let mut files = get_files();
-    // DEBUG, only keep a fixed number of files
-    // files = files
-    //     .iter()
-    //     .take(5000)
-    //     .map(|x| x.to_string())
-    //     .collect::<Vec<String>>();
+    let files = utils::get_files(String::from("./data/alerts/"));
 
     let total_nb_docs = files.len() as u64;
 
@@ -92,7 +59,6 @@ async fn process_files(
             index += 1;
         } else {
             tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
-            // println!("current queue len: {}", current_queue_len);
         }
     }
 
@@ -112,6 +78,7 @@ async fn process_files(
     Ok(())
 }
 
+// processes a record (alert) and sends result to local mongodb
 async fn process_record(
     record: apache_avro::types::Value,
     collection: &Collection<structs::AlertWithCoords>,
@@ -214,7 +181,8 @@ async fn process_record(
     Ok(())
 }
 
-async fn worker(queue: Arc<Mutex<Vec<apache_avro::types::Value>>>) -> Result<(), Box<dyn Error>> {
+// worker given records to process from queue
+pub async fn worker(queue: Arc<Mutex<Vec<apache_avro::types::Value>>>) -> Result<(), Box<dyn Error>> {
 
     let client_options = ClientOptions::parse("mongodb://localhost:27017").await?;
     let client = Client::with_options(client_options)?;
@@ -282,59 +250,5 @@ async fn worker(queue: Arc<Mutex<Vec<apache_avro::types::Value>>>) -> Result<(),
             }
         }
     }
-
     Ok(())
 }
-
-
-#[tokio::main]
-async fn main() {
-    let nb_workers = 10;
-    let max_queue_length = 1000;
-
-    // create the alerts queue
-    let queue = Arc::new(Mutex::new(Vec::new()));
-
-    // fire and forget the threaded workers
-    for _ in 0..nb_workers {
-        let queue = Arc::clone(&queue);
-        thread::spawn(move || {
-            let _ = tokio::runtime::Runtime::new().unwrap().block_on(worker(queue));
-        });
-    }
-
-    let now = std::time::Instant::now();
-
-    let _ = process_files(Arc::clone(&queue), max_queue_length).await;
-
-    println!("all files processed in {}s, stopping the app", now.elapsed().as_secs_f64());
-}
-
-// all files processed in 1068.59524525s, stopping the app
-
-
-
-// Test main function for dev purposes
-// #[tokio::main]
-// async fn main() -> mongodb::error::Result<()> {
-//     // Replace the placeholder with your Atlas connection string
-//     let uri = "mongodb://localhost:27017";
-//     // Create a new client and connect to the server
-//     let client = Client::with_uri_str(uri).await?;
-//     // Get a handle on the movies collection
-//     let database = client.database("kowalski");
-//     // let my_coll: Collection<Document> = database.collection("test");
-//     let collection: Collection<Document> = database.collection("people");
-    
-//     let result = collection.find_one(doc! {"name": "Paul"}, None).await?;
-    
-//     collection.insert_one(doc! {"name": "Lewis", "city": "Lancaster"}, None).await?;
-
-//     let result2 = collection.find_one(doc! {"name": "Lewis"}, None).await?;
-    
-
-//     println!("Found the first person:\n{:#?}", result);
-//     println!("Found the second person:\n{:#?}", result2);
-
-//     Ok(())
-// }

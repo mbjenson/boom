@@ -1,4 +1,25 @@
+#[allow(non_snake_case)]
+
 use futures::stream::{FuturesUnordered, StreamExt};
+use mongodb::{
+    bson::doc,
+    Collection
+};
+use crate::structs;
+
+
+// grab the list of all files from the provided directory
+pub fn get_files(dir_path: String) -> Vec<String> {
+    let paths = std::fs::read_dir(dir_path).unwrap();
+    let mut files = Vec::new();
+    for path in paths {
+        let path = path.unwrap().path();
+        let path = path.to_str().unwrap().to_string();
+        files.push(path);
+    }
+    files
+}
+
 
 // Rotation matrix for the conversion : x_galactic = R * x_equatorial (J2000)
 // http://adsabs.harvard.edu/abs/1989A&A...218..325M
@@ -153,20 +174,41 @@ pub fn in_ellipse(
     inside
 }
 
-use mongodb::bson::doc;
-use mongodb::Collection;
-
-use crate::structs;
 
 // this method takes ra, dec, a collection and a radius
 // and performs a cone search on the collection
 // returning a vector of documents
-pub async fn cone_search(
+// !not currently used
+// pub async fn cone_search(
+//     ra_geojson: f64,
+//     dec_geojson: f64,
+//     radius: &f64,
+//     collection: &Collection<mongodb::bson::Document>,
+// ) -> Result<Vec<mongodb::bson::Document>, Box<dyn std::error::Error>> {
+//     let filter = doc! {
+//         "coordinates.radec_geojson": {
+//             "$geoWithin": {
+//                 "$centerSphere": [[ra_geojson, dec_geojson], (radius * std::f64::consts::PI / 180.0 / 3600.0)]
+//             }
+//         }
+//     };
+//     // find all the documents that are within the radius
+//     let mut cursor = collection.find(filter, None).await?;
+//     let mut documents = Vec::new();
+//     while let Some(doc) = cursor.next().await {
+//         documents.push(doc?);
+//     }
+//     Ok(documents)
+// }
+
+
+pub async fn cone_search_named(
+    collection_name: &str,
     ra_geojson: f64,
     dec_geojson: f64,
-    radius: &f64,
+    radius: f64,
     collection: &Collection<mongodb::bson::Document>,
-) -> Result<Vec<mongodb::bson::Document>, Box<dyn std::error::Error>> {
+) -> Result<(String, Vec<mongodb::bson::Document>), Box<dyn std::error::Error>> {
     let filter = doc! {
         "coordinates.radec_geojson": {
             "$geoWithin": {
@@ -180,16 +222,14 @@ pub async fn cone_search(
     while let Some(doc) = cursor.next().await {
         documents.push(doc?);
     }
-    Ok(documents)
+    Ok((collection_name.to_string(), documents))
 }
 
-// write a method that takes ra, dec, ra_geojson, a collection, and a collection's crossmatch config
-// and performs a crossmatch on the collection
-// if the crossmatch config for that collection has use_distance=false, perform a simple cone search
-// if the crossmatch config for that collection has use_distance=true, perform a cone search and then
-// compute the distance in kpc between the ra, dec and the ra, dec of the documents returned returned, projected both at the same distance
-// from us. Filter out the documents where the distance to the ra,dec is greater than the config's max_distance
-// if it fails return an error
+
+// this method takes ra, dec, ra_geojson, a collection, and a collection's crossmatch config and performs 
+// a cross match on the collection  based on the crossmatch config
+// TODO: (https://github.com/Theodlz/boom/pull/11#discussion_r1679983922)
+/*
 pub async fn crossmatch(
     ra: f64,
     ra_geojson: f64,
@@ -330,30 +370,10 @@ pub async fn crossmatch(
         Ok(documents)
     }
 }
+*/
 
-pub async fn cone_search_named(
-    collection_name: &str,
-    ra_geojson: f64,
-    dec_geojson: f64,
-    radius: f64,
-    collection: &Collection<mongodb::bson::Document>,
-) -> Result<(String, Vec<mongodb::bson::Document>), Box<dyn std::error::Error>> {
-    let filter = doc! {
-        "coordinates.radec_geojson": {
-            "$geoWithin": {
-                "$centerSphere": [[ra_geojson, dec_geojson], (radius * std::f64::consts::PI / 180.0 / 3600.0)]
-            }
-        }
-    };
-    // find all the documents that are within the radius
-    let mut cursor = collection.find(filter, None).await?;
-    let mut documents = Vec::new();
-    while let Some(doc) = cursor.next().await {
-        documents.push(doc?);
-    }
-    Ok((collection_name.to_string(), documents))
-}
 
+// TODO: rewrite/delete this method (https://github.com/Theodlz/boom/pull/11#discussion_r1679985165)
 pub async fn crossmatch_parallel(
     ra: f64,
     ra_geojson: f64,
