@@ -1,5 +1,6 @@
 use flate2::read::GzDecoder;
 use std::io::{Cursor, Read};
+use tracing::warn;
 
 const NAXIS1_BYTES: &[u8] = "NAXIS1  =".as_bytes();
 const NAXIS2_BYTES: &[u8] = "NAXIS2  =".as_bytes();
@@ -116,10 +117,10 @@ pub fn normalize_image(image: Vec<f32>) -> Vec<f32> {
     let mut normalized = vec![];
     for pixel in image {
         if pixel.is_nan() {
-            //println!("Found a NaN");
+            warn!("Found a NaN");
             normalized.push(0.0);
         } else if pixel.is_infinite() {
-            println!("Found an infinity");
+            warn!("Found an infinity");
             // f32MIN if the number is negative, f32MAX if the number is positive
             normalized.push(if pixel.is_sign_negative() {
                 f32::MIN

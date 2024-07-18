@@ -178,28 +178,29 @@ pub fn in_ellipse(
 // and performs a cone search on the collection
 // returning a vector of documents
 // !not currently used
-// pub async fn cone_search(
-//     ra_geojson: f64,
-//     dec_geojson: f64,
-//     radius: &f64,
-//     collection: &Collection<mongodb::bson::Document>,
-// ) -> Result<Vec<mongodb::bson::Document>, Box<dyn std::error::Error>> {
-//     let filter = doc! {
-//         "coordinates.radec_geojson": {
-//             "$geoWithin": {
-//                 "$centerSphere": [[ra_geojson, dec_geojson], (radius * std::f64::consts::PI / 180.0 / 3600.0)]
-//             }
-//         }
-//     };
-//     // find all the documents that are within the radius
-//     let mut cursor = collection.find(filter, None).await?;
-//     let mut documents = Vec::new();
-//     while let Some(doc) = cursor.next().await {
-//         documents.push(doc?);
-//     }
-//     Ok(documents)
-// }
-
+/*
+pub async fn cone_search(
+    ra_geojson: f64,
+    dec_geojson: f64,
+    radius: &f64,
+    collection: &Collection<mongodb::bson::Document>,
+) -> Result<Vec<mongodb::bson::Document>, Box<dyn std::error::Error>> {
+    let filter = doc! {
+        "coordinates.radec_geojson": {
+            "$geoWithin": {
+                "$centerSphere": [[ra_geojson, dec_geojson], (radius * std::f64::consts::PI / 180.0 / 3600.0)]
+            }
+        }
+    };
+    // find all the documents that are within the radius
+    let mut cursor = collection.find(filter, None).await?;
+    let mut documents = Vec::new();
+    while let Some(doc) = cursor.next().await {
+        documents.push(doc?);
+    }
+    Ok(documents)
+}
+*/
 
 pub async fn cone_search_named(
     collection_name: &str,
