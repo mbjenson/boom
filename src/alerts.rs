@@ -18,6 +18,7 @@ use crate::structs;
 
 // push alerts onto queue which is then given to the workers to process asynchronously
 pub async fn process_files(
+    dir_path: String,
     queue: Arc<Mutex<Vec<apache_avro::types::Value>>>,
     max_queue_len: usize,
 ) -> Result<(), Box<dyn Error>> {
@@ -38,7 +39,7 @@ pub async fn process_files(
     let _ = client.database("kowalski").create_collection("alerts_aux", None).await?;
 
     let mut index = 0 as usize;
-    let files = utils::get_files(String::from("./data/alerts/"));
+    let files = utils::get_files(String::from(dir_path));
 
     let total_nb_docs = files.len() as u64;
 
@@ -88,7 +89,7 @@ async fn process_record(
 ) -> Result<(), Box<dyn Error>> {
     // process the record
     let mut alert: structs::AlertPacket = from_value(&record).unwrap();
-    let objectId = alert.objectId.clone();
+    let objectId: String = alert.objectId.clone();
     let candid = alert.candid.clone();
 
     // if there is already an alert with that candid, we skip it
