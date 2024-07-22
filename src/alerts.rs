@@ -80,7 +80,7 @@ pub async fn process_files(
 }
 
 // processes a record (alert) and sends result to local mongodb
-async fn process_record(
+pub async fn process_record(
     record: apache_avro::types::Value,
     collection: &Collection<structs::AlertWithCoords>,
     collection_aux: &Collection<structs::AlertAux>,

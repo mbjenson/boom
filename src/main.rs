@@ -12,7 +12,7 @@ use std::{
 async fn main() {
     let nb_workers = 10;
     let max_queue_length = 1000;
-    
+
     // location of alert files
     let alert_path = String::from("./data/sample_alerts");
 
