@@ -69,7 +69,7 @@ mod tests {
             .build()
             .unwrap();
         
-        let clu_config = utils::get_clu_config(conf.clone()).unwrap();
+        let clu_config = utils::get_clu_config(&conf).unwrap();
         let _clu_config = CrossmatchConfig {
             radius: 10800.0, // 3 degrees in arcseconds
             use_distance: true,
@@ -93,7 +93,7 @@ mod tests {
             .build()
             .unwrap();
         
-        let ned_config = utils::get_ned_config(conf.clone()).unwrap();
+        let ned_config = utils::get_ned_config(&conf).unwrap();
         let _ned_config = CrossmatchConfig {
             radius: 10800.0, // 3 degrees in arcseconds
             use_distance: true,
@@ -117,7 +117,7 @@ mod tests {
             .build()
             .unwrap();
         
-        let milliquas_config = utils::get_milliquas_config(conf.clone()).unwrap();
+        let milliquas_config = utils::get_milliquas_config(&conf).unwrap();
         let _milliquas_config = CrossmatchConfig {
             radius: 2.0,
             use_distance: false,

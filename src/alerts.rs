@@ -12,6 +12,7 @@ use apache_avro::{
     from_value,
     Reader,
 };
+use config::Config;
 
 use crate::utils;
 use crate::structs;
@@ -183,7 +184,7 @@ pub async fn process_record(
 }
 
 // worker given records to process from queue
-pub async fn worker(queue: Arc<Mutex<Vec<apache_avro::types::Value>>>) -> Result<(), Box<dyn Error>> {
+pub async fn worker(conf: Config, queue: Arc<Mutex<Vec<apache_avro::types::Value>>>) -> Result<(), Box<dyn Error>> {
 
     let client_options = ClientOptions::parse("mongodb://localhost:27017").await?;
     let client = Client::with_options(client_options)?;
@@ -192,7 +193,6 @@ pub async fn worker(queue: Arc<Mutex<Vec<apache_avro::types::Value>>>) -> Result
         client.database("kowalski").collection("alerts");
     let collection_aux: Collection<structs::AlertAux> =
         client.database("kowalski").collection("alerts_aux");
-
 
     let milliquas_v8: Collection<mongodb::bson::Document> =
         client.database("kowalski").collection("milliquas_v8");
@@ -204,27 +204,10 @@ pub async fn worker(queue: Arc<Mutex<Vec<apache_avro::types::Value>>>) -> Result
     let crossmatching_collections =
         vec![("milliquas_v8", milliquas_v8), ("CLU", clu), ("NED", ned)];
 
-    let milliquas_config = structs::CrossmatchConfig {
-        radius: 2.0,
-        use_distance: false,
-        ..Default::default()
-    };
-    let clu_config = structs::CrossmatchConfig {
-        radius: 10800.0, // 3 degrees in arcseconds
-        use_distance: true,
-        distance_key: "z".to_string(),
-        distance_max: 30.0,       // 30 Kpc
-        distance_max_near: 300.0, // 5 arcsec for objects that are too close (z < 0.01)
-        distance_unit: "redshift".to_string(),
-    };
-    let ned_config = structs::CrossmatchConfig {
-        radius: 10800.0, // 3 degrees in arcseconds
-        use_distance: true,
-        distance_key: "DistMpc".to_string(),
-        distance_max: 30.0,       // 30 Kpc
-        distance_max_near: 300.0, // 5 arcsec for objects that are too close (z < 0.01)
-        distance_unit: "Mpc".to_string(),
-    };
+    let milliquas_config = utils::get_milliquas_config(&conf).unwrap();
+    let clu_config = utils::get_clu_config(&conf).unwrap();
+    let ned_config = utils::get_ned_config(&conf).unwrap();
+
     // hashmap with the config per crossmatching collection
     let crossmatching_config = vec![
         ("milliquas_v8", milliquas_config),

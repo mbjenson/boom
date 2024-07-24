@@ -51,7 +51,11 @@ mod test {
             });
         }
         
-        let _ = alerts::process_files(String::from("./data/sample_alerts"), Arc::clone(&queue), 10).await;
+        let _ = alerts::process_files(
+            String::from("./data/sample_alerts"), 
+            Arc::clone(&queue), 
+            10)
+            .await;
 
         // drop tables when done with test
         tu::drop_test_alert_collections(client.clone()).await?;

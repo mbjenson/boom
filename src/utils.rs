@@ -378,17 +378,17 @@ pub fn build_config(filepath: &str) -> Result<Config, ConfigError> {
     Ok(conf)
 }
 
-pub fn get_clu_config(conf: Config) -> Result<CrossmatchConfig, Box<dyn Error>> {
+pub fn get_clu_config(conf: &Config) -> Result<CrossmatchConfig, Box<dyn Error>> {
     let clu_config = conf.get::<CrossmatchConfig>("kowalski.crossmatching.clu")?;
     Ok(clu_config)
 }
 
-pub fn get_ned_config(conf: Config) -> Result<CrossmatchConfig, Box<dyn Error>> {
+pub fn get_ned_config(conf: &Config) -> Result<CrossmatchConfig, Box<dyn Error>> {
     let ned_config = conf.get::<CrossmatchConfig>("kowalski.crossmatching.ned")?;
     Ok(ned_config)
 }
 
-pub fn get_milliquas_config(conf: Config) -> Result<CrossmatchConfig, Box<dyn Error>> {
+pub fn get_milliquas_config(conf: &Config) -> Result<CrossmatchConfig, Box<dyn Error>> {
     let mill_config = conf.get::<CrossmatchConfig>("kowalski.crossmatching.milliquas_v8")?;
     Ok(mill_config)
 }
