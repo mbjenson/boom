@@ -5,7 +5,14 @@ use mongodb::{
     bson::doc,
     Collection
 };
-use crate::structs;
+use config::{
+    Config,
+    ConfigError,
+    Environment,
+    File,
+};
+use std::error::Error;
+use crate::structs::{self, CrossmatchConfig};
 
 // grab the list of all files from the provided directory
 pub fn get_files(dir_path: String) -> Vec<String> {
@@ -359,4 +366,29 @@ pub async fn crossmatch_parallel(
         }
     }
     Ok(results)
+}
+
+// build a parsed config::Config from file path
+// @param filepath: path to file without file extension
+pub fn build_config(filepath: &str) -> Result<Config, ConfigError> {
+    let conf = Config::builder()
+        .add_source(File::with_name(filepath))
+        .build()
+        .unwrap();
+    Ok(conf)
+}
+
+pub fn get_clu_config(conf: Config) -> Result<CrossmatchConfig, Box<dyn Error>> {
+    let clu_config = conf.get::<CrossmatchConfig>("kowalski.crossmatching.clu")?;
+    Ok(clu_config)
+}
+
+pub fn get_ned_config(conf: Config) -> Result<CrossmatchConfig, Box<dyn Error>> {
+    let ned_config = conf.get::<CrossmatchConfig>("kowalski.crossmatching.ned")?;
+    Ok(ned_config)
+}
+
+pub fn get_milliquas_config(conf: Config) -> Result<CrossmatchConfig, Box<dyn Error>> {
+    let mill_config = conf.get::<CrossmatchConfig>("kowalski.crossmatching.milliquas_v8")?;
+    Ok(mill_config)
 }
