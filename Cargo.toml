@@ -20,15 +20,18 @@ futures = "0.3.30"
 cargo-quickinstall = "0.2.10"
 tracing = "0.1.40"
 config = "0.14.0"
-float-cmp = "0.9.0"
 
-# [dependencies.mongodb]
-# version = "2.8.0"
-# features = ["tokio-sync"]
-#
+[dev-dependencies]
+float-cmp = "0.9.0"
+criterion = { version = "0.5.1", features = ["html_reports"] }
+
 [dependencies.mongodb]
 version = "2.8.0"
 features = ["tokio-runtime"]
+
+[[bench]]
+name = "boom_benchmark"
+harness = false
 
 [[bin]]
 name = "boom"
