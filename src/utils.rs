@@ -15,7 +15,7 @@ use std::error::Error;
 use crate::structs::{self, CrossmatchConfig};
 
 // grab the list of all files from the provided directory
-pub fn get_files(dir_path: String) -> Vec<String> {
+pub fn get_file_names(dir_path: String) -> Vec<String> {
     let paths = std::fs::read_dir(dir_path).unwrap();
     let mut files = Vec::new();
     for path in paths {
@@ -29,10 +29,17 @@ pub fn get_files(dir_path: String) -> Vec<String> {
 
 // Rotation matrix for the conversion : x_galactic = R * x_equatorial (J2000)
 // http://adsabs.harvard.edu/abs/1989A&A...218..325M
+// const RGE: [[f64; 3]; 3] = [
+//     [0.0524767519, 0.9976931946, 0.0543758425],
+//     [0.9939326351, -0.0548018445, -0.0969076596],
+//     [-0.0966835603, 0.0464756311, -0.9949210238],
+// ];
+
+// from kowalski python repo
 const RGE: [[f64; 3]; 3] = [
-    [0.0524767519, 0.9976931946, 0.0543758425],
-    [0.9939326351, -0.0548018445, -0.0969076596],
-    [-0.0966835603, 0.0464756311, -0.9949210238],
+    [-0.054875539, -0.873437105, -0.483834992],
+    [0.494109454, -0.444829594, 0.746982249],
+    [-0.867666136, -0.198076390, 0.455983795],
 ];
 
 const DEGRA: f64 = std::f64::consts::PI / 180.0;
@@ -44,7 +51,7 @@ pub fn great_circle_distance(ra1_deg: f64, dec1_deg: f64, ra2_deg: f64, dec2_deg
     let ra2 = ra2_deg * DEGRA;
     let dec2 = dec2_deg * DEGRA;
     let delta_ra = (ra2 - ra1).abs();
-    let mut distance = (dec2.sin() * delta_ra.cos()).powi(2)
+    let mut distance = (dec2.cos() * delta_ra.sin()).powi(2) // let mut distance = (dec2.sin() * delta_ra.cos()).powi(2)
         + (dec1.cos() * dec2.sin() - dec1.sin() * dec2.cos() * delta_ra.cos()).powi(2);
     distance = distance
         .sqrt()

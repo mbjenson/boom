@@ -5,61 +5,46 @@ use config::{
     Environment,
     File,
 };
+const EPS: f64 = 0.00000005;
+use boom::structs::CrossmatchConfig;
+use float_cmp::approx_eq;
 
 #[cfg(test)]
 mod tests {
-
-    const EPS: f64 = 0.00000005;
-
-    use std::f32::EPSILON;
-
-    use boom::structs::CrossmatchConfig;
-    use float_cmp::approx_eq;
-
     use super::*;
-
-    // TODO: fill in tests with realistic values and answers
 
     #[test]
     fn test_utils_great_circle_distance() {
-        // let x = utils::great_circle_distance(ra1_deg, dec1_deg, ra2_deg, dec2_deg);
-        // assert_eq!(x, answer);
+        let x = utils::great_circle_distance(10.0, 12.0, 5.2, 8.5);
+        assert!(approx_eq!(f64, x, 5.878131520996996, epsilon = EPS));
     }
 
     #[test]
     fn test_utils_radec2lb() {
-        // let x = utils::radec2lb(ra, dec);
-        // assert_eq!(x, answer);
+        let x = utils::radec2lb(5.67, 35.2);
+        let answer = (116.32324022484094, -27.302450971293737);
+        assert!(approx_eq!(f64, x.0, answer.0, epsilon = EPS));
+        assert!(approx_eq!(f64, x.1, answer.1, epsilon = EPS));
     }
 
     #[test]
     fn test_utils_deg2hms() {
-        // let x = utils::deg2hms(deg);
-        // assert_eq!(x, answer)
+        let x = utils::deg2hms(5.64);
+        assert_eq!(x, String::from("00:22:33.6000"));
     }
 
     #[test]
     fn test_utils_deg2dms() {
-        // let x = utils::deg2dms(deg);
-        // assert_eq!(x, answer);
+        let x = utils::deg2dms(5.64);
+        assert_eq!(x, String::from("05:38:24.000"));
     }
 
     #[test]
     fn test_utils_in_ellipse() {
-        // let x = utils::in_ellipse(alpha, delta0, alpha1, delta01, d0, axis_ratio, PAO);
-        // assert_eq!(x, answer);
-    }
-
-    #[test]
-    fn test_utils_cone_search_named() {
-        // let x = utils::cone_search_named(collection_name, ra_geojson, dec_geojson, radius, collection);
-        // assert_eq!(x, answer);
-    }
-
-    #[test]
-    fn test_utils_crossmatch_parallel() {
-        // let x = utils::crossmatch_parallel(ra, ra_geojson, dec, collections, crossmatch_configs);
-        // assert_eq(x, answer):
+        let is_in_ellipse = utils::in_ellipse(5.64, 4.65, 10.5, 95.5, 35.3, 1.0, 0.0);
+        assert_eq!(false, is_in_ellipse);
+        let is_not_in_ellipse = utils::in_ellipse(5.64, 4.65, 10.5, 10.5, 35.3, 1.0, 0.0);
+        assert_eq!(true, is_not_in_ellipse);
     }
 
     #[test]

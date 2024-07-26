@@ -40,7 +40,7 @@ pub async fn process_files(
     let _ = client.database("kowalski").create_collection("alerts_aux", None).await?;
 
     let mut index = 0 as usize;
-    let files = utils::get_files(String::from(dir_path));
+    let files = utils::get_file_names(String::from(dir_path));
 
     let total_nb_docs = files.len() as u64;
 
