@@ -1,0 +1,23 @@
+kowalski:
+    crossmatching:
+        clu:
+            radius: 10800.0
+            use_distance: true
+            distance_key: "z"
+            distance_max: 30.0
+            distance_max_near: 300.0
+            distance_unit: "redshift"
+        ned:
+            radius: 10800.0
+            use_distance: true
+            distance_key: "DistMpc"
+            distance_max: 30.0
+            distance_max_near: 300.0
+            distance_unit: "Mpc"
+        milliquas_v8:
+            radius: 2.0
+            use_distance: false
+            distance_key: "z"
+            distance_unit: "redshift"
+            distance_max: 30.0
+            distance_max_near: 5.0
