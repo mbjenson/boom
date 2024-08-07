@@ -14,7 +14,7 @@ use config::{
 use std::error::Error;
 use crate::structs::{self, CrossmatchConfig};
 
-// grab the list of all files from the provided directory
+// grab the list of all filenames from the provided directory
 pub fn get_file_names(dir_path: String) -> Vec<String> {
     let paths = std::fs::read_dir(dir_path).unwrap();
     let mut files = Vec::new();
@@ -26,16 +26,7 @@ pub fn get_file_names(dir_path: String) -> Vec<String> {
     files
 }
 
-
-// Rotation matrix for the conversion : x_galactic = R * x_equatorial (J2000)
-// http://adsabs.harvard.edu/abs/1989A&A...218..325M
-// const RGE: [[f64; 3]; 3] = [
-//     [0.0524767519, 0.9976931946, 0.0543758425],
-//     [0.9939326351, -0.0548018445, -0.0969076596],
-//     [-0.0966835603, 0.0464756311, -0.9949210238],
-// ];
-
-// from kowalski python repo
+// matrix used for conversions
 const RGE: [[f64; 3]; 3] = [
     [-0.054875539, -0.873437105, -0.483834992],
     [0.494109454, -0.444829594, 0.746982249],
@@ -187,7 +178,6 @@ pub fn in_ellipse(
     inside
 }
 
-
 pub async fn cone_search_named(
     collection_name: &str,
     ra_geojson: f64,
@@ -211,8 +201,6 @@ pub async fn cone_search_named(
     Ok((collection_name.to_string(), documents))
 }
 
-
-// TODO: rewrite/delete this method (https://github.com/Theodlz/boom/pull/11#discussion_r1679985165)
 pub async fn crossmatch_parallel(
     ra: f64,
     ra_geojson: f64,
