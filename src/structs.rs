@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use crate::utils::{deg2dms, deg2hms, radec2lb};
 
 // schema: https://zwickytransientfacility.github.io/ztf-avro-alert/schema.html
-#[derive(Deserialize, Serialize, Debug, Clone)]
+#[derive(Deserialize, Serialize, Debug, Clone, PartialEq)]
 #[serde(untagged)]
 pub enum Union {
     Int(i64),
