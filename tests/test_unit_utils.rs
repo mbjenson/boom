@@ -1,8 +1,6 @@
 use boom::utils;
 use config::{
     Config,
-    ConfigError,
-    Environment,
     File,
 };
 mod testing_utils;
@@ -11,7 +9,7 @@ use boom::structs::CrossmatchConfig;
 use float_cmp::approx_eq;
 
 #[cfg(test)]
-mod tests {
+mod test_utils {
     use super::*;
 
     #[test]
@@ -116,5 +114,4 @@ mod tests {
         assert!(approx_eq!(f64, milliquas_config.distance_max, _milliquas_config.distance_max, epsilon = tu::EPS));
         assert!(approx_eq!(f64, milliquas_config.distance_max_near, _milliquas_config.distance_max_near, epsilon = tu::EPS));
     }
-
 }
