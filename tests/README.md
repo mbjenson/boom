@@ -13,3 +13,6 @@ Run a test by supplying the test name as it appears in the code.
 To run multiple tests specify part of a test name that matches all the tests that should be run
 
 `cargo test <unique_descriptor>`
+
+### Helpful Tips
+To show verbose output from any tests run the test with `-- --nocapture`
