@@ -1,30 +1,291 @@
 use boom::structs;
-use boom::alerts;
 use boom::structs::Candidate;
 use boom::structs::Detection;
 use boom::utils;
+use futures::stream::{FuturesUnordered, StreamExt};
 use mongodb::{
     options::ClientOptions,
     Client,
     Collection,
-    bson::doc,
     bson::Document,
 };
-use apache_avro::{from_value, Reader,};
+use apache_avro::Reader;
 use std::{
-    sync::Arc,
-    sync::Mutex,
-    thread,
     error::Error,
     fs::File,
     io::BufReader,
-
 };
 
 pub const EPS: f64 = 0.00000005;
 // utilities for writting tests for boom
 
-pub async fn build_alert_queue(
+
+pub async fn test_helper_crossmatch_parallel(
+    ra: f64, ra_geojson: f64, dec: f64,
+    collections: &Vec<(&str, Collection<mongodb::bson::Document>)>,
+    crossmatch_configs: &Vec<(&str, structs::CrossmatchConfig)>
+) -> Result<std::collections::HashMap<String, Vec<mongodb::bson::Document>>, Box<dyn std::error::Error>> {
+    
+    // 1. run crossmatch_parallel() on data
+    let crossmatch_result = utils::crossmatch_parallel(ra, ra_geojson, dec, collections, crossmatch_configs).await?;
+
+    // 2. manually perform operations on data here and compare the results
+    let mut query_futures = FuturesUnordered::new();
+    for (collection_name, collection) in collections {
+        let crossmatch_config = &crossmatch_configs
+            .iter()
+            .find(|(name, _)| name == collection_name)
+            .unwrap().1;
+
+        let query_future = utils::cone_search_named(
+            collection_name, ra_geojson, dec, 
+            crossmatch_config.radius.clone(), collection);
+        query_futures.push(query_future);
+    }
+
+    let mut results = std::collections::HashMap::new();
+    while let Some(result) = query_futures.next().await {
+        match result {
+            Ok((collection_name, documents)) => {
+                let crossmatch_config = &crossmatch_configs
+                    .iter()
+                    .find(|(name, _)| name == &collection_name)
+                    .unwrap().1;
+                if crossmatch_config.use_distance {
+                    let distance_unit = &crossmatch_config.distance_unit;
+                    let distance_key = &crossmatch_config.distance_key;
+                    let max_distance = crossmatch_config.distance_max;
+                    let max_distance_near = crossmatch_config.distance_max_near;
+                    let mut new_documents: Vec<mongodb::bson::Document> = Vec::new();
+                    for doc in documents {
+                        let doc_ra_option = match doc.get("ra") {
+                            Some(ra) => ra.as_f64(),
+                            _ => {
+                                continue;
+                            }
+                        };
+                        if doc_ra_option.is_none() {
+                            continue;
+                        }
+                        let doc_ra = doc_ra_option.unwrap();
+                        let doc_dec_option = match doc.get("dec") {
+                            Some(dec) => dec.as_f64(),
+                            _ => {
+                                continue;
+                            }
+                        };
+                        if doc_dec_option.is_none() {
+                            continue;
+                        }
+                        let doc_dec = doc_dec_option.unwrap();
+                        if distance_unit == "redshift" {
+
+                            let result = utils::distance_filter_redshift(
+                                doc.clone(), distance_key, 
+                                max_distance_near, max_distance, 
+                                (doc_ra, doc_dec), (ra, dec));
+                            match result {
+                                Some(x) => new_documents.push(x),
+                                _ => continue,
+                            }
+                            println!("doc:\n{:?}, distance_key:\n{:?},
+                                max_distance_near:\n{:?}, max_distance:\n{:?}, 
+                                doc_ra:\n{:?}, doc_dec:\n{:?}, ra:\n{:?}, dec:\n{:?}", 
+                                doc.clone(), distance_key, max_distance_near, 
+                                max_distance, doc_ra, doc_dec, ra, dec
+                            );
+                            let _ = test_helper_distance_filter_redshift(
+                                doc, distance_key, 
+                                max_distance_near, max_distance, 
+                                (doc_ra, doc_dec), (ra, dec));
+
+                        } else if distance_unit == "mpc" {
+                            let result = utils::distance_filter_mpc(
+                                doc.clone(), distance_key, max_distance_near, max_distance, 
+                                (doc_ra, doc_dec), (ra, dec));
+                            match result {
+                                Some(x) => new_documents.push(x),
+                                _ => continue,
+                            }
+
+                            let _ = test_helper_distance_filter_mpc(
+                                doc, distance_key,
+                                max_distance_near, max_distance,
+                                (doc_ra, doc_dec), (ra, dec));
+
+                        } else {
+                            unimplemented!();
+                        }
+                    }
+                    results.insert(collection_name, new_documents);
+                } else {
+                    results.insert(collection_name, documents);
+                }
+            }
+            Err(e) => {
+                panic!("Error: {:?}", e);
+            }
+        }
+    }
+
+    // 3. compare results
+    assert_eq!(results, crossmatch_result);
+
+    Ok(results)
+}
+
+
+pub async fn test_helper_distance_filter_mpc(
+    doc: mongodb::bson::Document, distance_key: &String,
+    max_distance_near: f64, max_distance: f64,
+    doc_celestial: (f64, f64), celestial: (f64, f64),
+) -> Result<(), Box<dyn Error>> {
+    // 1. run func on input
+    let result = utils::distance_filter_mpc(
+        doc.clone(), distance_key, 
+        max_distance_near, max_distance, 
+        doc_celestial, celestial);
+    // 2. manually calculate the result
+    let result_man: Option<mongodb::bson::Document> = loop {            
+        let doc_ra = doc_celestial.0;
+        let doc_dec = doc_celestial.1;
+
+        let ra = celestial.0;
+        let dec = celestial.1;
+
+        let doc_mpc_option = match doc.get(&distance_key) {
+            // mpc could be f64 or i32, so try both
+            Some(mpc) => {
+                let mpc_f64 = mpc.as_f64();
+                if mpc_f64.is_none() {
+                    let mpc_i32 = mpc.as_i32();
+                    if mpc_i32.is_none() {
+                        None
+                    } else {
+                        Some(mpc_i32.unwrap() as f64)
+                    }
+                } else {
+                    mpc_f64
+                }
+            }
+            _ => {
+                println!("No mpc");
+                break None;
+            }
+        };
+        if doc_mpc_option.is_none() {
+            // also print the distance key we are using
+            println!("Mpc is none using {}", distance_key);
+            // print the document _id
+            println!("{:?}", doc.get("_id"));
+            break None;
+        }
+        let doc_mpc = doc_mpc_option.unwrap();
+        let cm_radius = if doc_mpc < 40.0 {
+            max_distance_near / 3600.0 // to degrees
+        } else {
+            (max_distance / (doc_mpc * 1000.0)) // 10**3
+                .atan()
+                .to_degrees()
+        };
+        if utils::in_ellipse(ra, dec, doc_ra, doc_dec, cm_radius, 1.0, 0.0) {
+            // here we don't * 3600.0 yet because we need to calculate the distance in kpc first
+            let angular_separation = utils::great_circle_distance(ra, dec, doc_ra, doc_dec);
+            // calculate the distance between objs in kpc
+            let distance_kpc = if doc_mpc > 0.005 {
+                angular_separation.to_radians() * (doc_mpc * 1000.0)
+            } else {
+                -1.0
+            };
+            // overwrite doc_copy with doc_copy + the angular separation and the distance in kpc
+            // multiply by 3600.0 to get the angular separation in arcseconds
+            let mut doc_copy = doc.clone();
+            doc_copy.insert("angular_separation", angular_separation * 3600.0);
+            doc_copy.insert("distance_kpc", distance_kpc);
+            break Some(doc_copy);
+        }
+        break None;
+    };
+
+    // 3. compare the results
+    assert_eq!(result.unwrap(), result_man.unwrap());
+
+    Ok(())
+}
+
+pub async fn test_helper_distance_filter_redshift(
+    doc: mongodb::bson::Document, distance_key: &String,
+    max_distance_near: f64, max_distance: f64,
+    doc_celestial: (f64, f64), celestial: (f64, f64),
+    // take in the params that distance_filter_redshift would and 
+    // compare function output to the desired, manually calculated result
+) -> Result<(), Box<dyn Error>> {
+    // 1. run func on input
+    let result = utils::distance_filter_redshift(
+        doc.clone(), distance_key, 
+        max_distance_near, max_distance, 
+        doc_celestial, celestial);
+    
+    // 2. manually calculate result
+
+    // using a loop hack which allows the simulation of a 
+    // function call with various potential exit points
+    let result_man: Option<mongodb::bson::Document> = loop {
+        let ra = celestial.0;
+        let dec = celestial.1;
+        let doc_ra = doc_celestial.0;
+        let doc_dec = doc_celestial.1;
+
+        let doc_z_option = match doc.get(&distance_key) {
+            Some(z) => z.as_f64(),
+            _ => {
+                break None;
+            }
+        };
+        if doc_z_option.is_none() {
+            break None;
+        }
+        let doc_z = doc_z_option.unwrap();
+
+        let cm_radius = if doc_z < 0.01 {
+            max_distance_near / 3600.0
+        } else {
+            max_distance * (0.05 / doc_z) / 3600.0
+        };
+
+        if utils::in_ellipse(
+            ra, dec, doc_ra, 
+            doc_dec, cm_radius, 1.0, 0.0)
+        {
+            let angular_seperation = 
+                utils::great_circle_distance(
+                    ra, dec, 
+                    doc_ra, doc_dec) * 3600.0;
+            // calculate distance between objs in kpc
+            let distance_kpc = if doc_z > 0.005 {
+                angular_seperation * (doc_z / 0.05)
+            } else {
+                -1.0
+            };
+            
+            let mut doc_copy = doc.clone();
+            // overwrite doc_copy with doc_copy + the angular seperation
+            // and the distance in kpc
+            doc_copy.insert("angular_seperation", angular_seperation);
+            doc_copy.insert("distance_kpc", distance_kpc);
+            break Some(doc_copy);
+        }
+        break None;
+    };
+
+    // 3. compare results
+    assert_eq!(result.unwrap(), result_man.unwrap());
+    
+    Ok(())
+}
+
+
+pub fn build_alert_queue(
     alert_path: String,
     max_queue_len: usize,
     num_alerts: usize,
@@ -48,14 +309,6 @@ pub async fn build_alert_queue(
                 let record = record.unwrap();
                 queue.push(record);
             }
-            // thread::spawn(move || {
-            //     let file = File::open(file_name).unwrap();
-            //     let reader = Reader::new(BufReader::new(file)).unwrap();
-            //     for record in reader {
-            //         let record = record.unwrap();
-            //         queue.push(record);
-            //     }
-            // });
             index += 1;
         }
     }
