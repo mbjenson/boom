@@ -293,8 +293,6 @@ pub fn build_alert_queue(
     let mut index = 0 as usize;
     let files = utils::get_file_names(String::from(alert_path));
 
-    let total_nb_docs = files.len() as u64;
-
     let mut queue = Vec::<apache_avro::types::Value>::new();
 
     while index < files.len() && index < num_alerts {
