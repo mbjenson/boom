@@ -287,28 +287,21 @@ pub async fn test_helper_distance_filter_redshift(
 
 pub fn build_alert_queue(
     alert_path: String,
-    max_queue_len: usize,
     num_alerts: usize,
 ) -> Result<Vec<apache_avro::types::Value>, Box<dyn Error>> {
     let mut index = 0 as usize;
     let files = utils::get_file_names(String::from(alert_path));
-
     let mut queue = Vec::<apache_avro::types::Value>::new();
 
     while index < files.len() && index < num_alerts {
-        // add the record to the queue
-        let current_queue_len = queue.len();
-        if current_queue_len < max_queue_len {
-            let file_name = files[index].clone();
-            // let queue = queue.clone();
-            let file = File::open(file_name).unwrap();
-            let reader = Reader::new(BufReader::new(file)).unwrap();
-            for record in reader {
-                let record = record.unwrap();
-                queue.push(record);
-            }
-            index += 1;
+        let file_name = files[index].clone();
+        let file = File::open(file_name).unwrap();
+        let reader = Reader::new(BufReader::new(file)).unwrap();
+        for record in reader {
+            let record = record.unwrap();
+            queue.push(record);
         }
+        index += 1;
     }
     Ok(queue)
 }

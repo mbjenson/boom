@@ -25,7 +25,7 @@ mod test_alerts {
         let _ = tu::drop_test_alert_collections(client.clone()).await?;
         let _ = tu::create_test_alert_collections(client.clone()).await?;
         
-        let mut records = tu::build_alert_queue(String::from("./data/sample_alerts"), 1, num_alerts).unwrap();
+        let mut records = tu::build_alert_queue(String::from("./data/sample_alerts"), num_alerts).unwrap();
         
         let x_match_tup = tu::get_test_crossmatching_vecs(client.clone());
         let test_col = tu::get_test_alert_collections(client.clone());

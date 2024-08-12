@@ -16,7 +16,7 @@ mod test_structs {
     fn test_get_coordinates() -> Result<(), Box<dyn Error>> {
         // create queue with one record inside from file
         let mut queue = tu::build_alert_queue(
-            String::from("./data/sample_alerts"), 1, 1).unwrap();
+            String::from("./data/sample_alerts"), 1).unwrap();
         // get record from top of queue
         let record = queue.pop().unwrap();
         // get alert packet from record
