@@ -15,12 +15,14 @@ use crate::benchmark_util as util;
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
 
+    util::insert_test_filter().await;
+    
     let queue_name = "benchmarkqueue";
     util::setup_benchmark(&queue_name).await?;
 
     // grab command line arguments
     let args: Vec<String> = env::args().collect();
-    let mut filter_id = 1;
+    let mut filter_id = -1;
     let mut n = 20;
     if args.len() > 2 {
         filter_id = args[2].parse::<i32>().unwrap();
@@ -71,6 +73,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
             },
         }
     }
+    util::remove_test_filter().await;
+
     // println!("=========================\n   FULL OUTPUT\n=========================");
     // for run in runs.clone() {
     //     println!("run {} filtered {} candids in {} seconds", run.0, run.1, run.2);
