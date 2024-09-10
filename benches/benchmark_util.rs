@@ -1,7 +1,54 @@
 use boom::conf;
 use boom::alert;
 use redis::AsyncCommands;
+use mongodb::bson::doc;
 
+// insert a test filter into the database with filter_id -1
+pub async fn insert_test_filter() {
+
+    let filter_obj: mongodb::bson::Document = doc!{
+        "_id": {
+          "$oid": "66cc9b384e3210074763c611"
+        },
+        "group_id": 41,
+        "filter_id": -1,
+        "catalog": "ZTF_alerts",
+        "permissions": [
+          1
+        ],
+        "active": true,
+        "active_fid": "v2e0fs",
+        "fv": [
+          {
+            "fid": "v2e0fs",
+            "pipeline": "[{\"$project\": {\"cutoutScience\": 0, \"cutoutDifference\": 0, \"cutoutTemplate\": 0, \"publisher\": 0, \"schemavsn\": 0}}, {\"$lookup\": {\"from\": \"alerts_aux\", \"localField\": \"objectId\", \"foreignField\": \"_id\", \"as\": \"aux\"}}, {\"$project\": {\"objectId\": 1, \"candid\": 1, \"candidate\": 1, \"classifications\": 1, \"coordinates\": 1, \"prv_candidates\": {\"$arrayElemAt\": [\"$aux.prv_candidates\", 0]}, \"cross_matches\": {\"$arrayElemAt\": [\"$aux.cross_matches\", 0]}}}, {\"$match\": {\"candidate.drb\": {\"$gt\": 0.5}, \"candidate.ndethist\": {\"$gt\": 1.0}, \"candidate.magpsf\": {\"$lte\": 18.5}}}]",
+            "created_at": {
+              "$date": "2020-10-21T08:39:43.693Z"
+            }
+          }
+        ],
+        "autosave": false,
+        "update_annotations": true,
+        "created_at": {
+          "$date": "2021-02-20T08:18:28.324Z"
+        },
+        "last_modified": {
+          "$date": "2023-05-04T23:39:07.090Z"
+        }
+      };
+
+    let config_file = conf::load_config("./config.yaml").unwrap();
+    let db = conf::build_db(&config_file, true).await;
+    let _ = db.collection::<mongodb::bson::Document>("filters").insert_one(filter_obj);
+    
+}
+
+// remove test filter with filter_id -1 from the database
+pub async fn remove_test_filter() {
+    let config_file = conf::load_config("./config.yaml").unwrap();
+    let db = conf::build_db(&config_file, true).await;
+    let _ = db.collection::<mongodb::bson::Document>("filters").delete_one(doc!{"filter_id": -1}).await;
+}
 
 // puts candids of processed alerts into a redis queue queue_name
 pub async fn setup_benchmark(queue_name: &str) -> Result<(), Box<dyn std::error::Error>> {
