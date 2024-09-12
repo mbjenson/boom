@@ -80,14 +80,16 @@ pub async fn drop_alert_collections() -> Result<(), Box<dyn std::error::Error>> 
 pub async fn alert_worker(output_queue_name: &str) {
 
     let config_file = conf::load_config("./config.yaml").unwrap();
-
-    let xmatch_configs = conf::build_xmatch_configs(&config_file);
+    let stream_name = "ZTF";
+    let xmatch_configs = conf::build_xmatch_configs(&config_file, stream_name);
     let db: mongodb::Database = conf::build_db(&config_file, true).await;
 
     if let Err(e) = db.list_collection_names().await {
         println!("Error connecting to the database: {}", e);
         return;
     }
+    let alert_collection = db.collection(&format!("{}_alerts", stream_name));
+    let alert_aux_collection = db.collection(&format!("{}_alerts_aux", stream_name));
 
     let packet_queue = "testalertpacketqueue";
     let packet_queue_temp = "testalertpacketqueuetemp";
@@ -101,7 +103,13 @@ pub async fn alert_worker(output_queue_name: &str) {
         let result: Option<Vec<Vec<u8>>> = con.rpoplpush(packet_queue, packet_queue_temp).await.unwrap();
         match result {
             Some(value) => {
-                let candid = alert::process_alert(value[0].clone(), &xmatch_configs, &db).await;
+                let candid = alert::process_alert(
+                    value[0].clone(), 
+                    &xmatch_configs, 
+                    &db,
+                    &alert_collection,
+                    &alert_aux_collection,
+                ).await;
                 match candid {
                     Ok(Some(candid)) => {
                         // println!("Processed alert with candid: {}, queueing for classification", candid);
