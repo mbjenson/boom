@@ -65,9 +65,9 @@ pub async fn setup_benchmark(queue_name: &str) -> Result<(), Box<dyn std::error:
 pub async fn drop_alert_collections() -> Result<(), Box<dyn std::error::Error>> {
     let config_file = conf::load_config("./config.yaml").unwrap();
     let db = conf::build_db(&config_file, true).await;
-    db.collection::<mongodb::bson::Document>("alerts").drop().await?;
-    db.collection::<mongodb::bson::Document>("alerts_aux").drop().await?;
-    println!("dropped collections: 'alerts' & 'alerts_aux'");
+    db.collection::<mongodb::bson::Document>("ZTF_alerts").drop().await?;
+    db.collection::<mongodb::bson::Document>("ZTF_alerts_aux").drop().await?;
+    println!("dropped collections: 'ZTF_alerts' & 'ZTF_alerts_aux'");
     Ok(())
 }
 
