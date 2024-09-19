@@ -11,7 +11,7 @@ use boom::{
 mod benchmark_util;
 use crate::benchmark_util as util;
 
-// run: cargo bench filter_benchmark -- <filter_id> <num_iterations_on_candids>
+// run: cargo bench filter_benchmark -- <num_iterations_on_candids> <filter_id>
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
 
@@ -24,9 +24,13 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let args: Vec<String> = env::args().collect();
     let mut filter_id = -1;
     let mut n = 20;
-    if args.len() > 2 {
-        filter_id = args[2].parse::<i32>().unwrap();
-        n = args[3].parse::<i32>().unwrap();
+    if args.len() == 4 {
+        n = args[2].parse::<i32>().unwrap();
+    } else if args.len() == 5 {
+        filter_id = args[3].parse::<i32>().unwrap();
+        n = args[2].parse::<i32>().unwrap();
+    } else if args.len() > 5 {
+        panic!("invalid arguments. benchmark usage: `cargo bench filter_benchmark -- <num_iterations> <filter_id>")
     }
 
     // connect to mongo and redis
