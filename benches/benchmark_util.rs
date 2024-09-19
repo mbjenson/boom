@@ -7,9 +7,7 @@ use mongodb::bson::doc;
 pub async fn insert_test_filter() {
 
     let filter_obj: mongodb::bson::Document = doc!{
-        "_id": {
-          "$oid": "66cc9b384e3210074763c611"
-        },
+        "_id": mongodb::bson::oid::ObjectId::new(),
         "group_id": 41,
         "filter_id": -1,
         "catalog": "ZTF_alerts",
@@ -36,11 +34,10 @@ pub async fn insert_test_filter() {
           "$date": "2023-05-04T23:39:07.090Z"
         }
       };
-
+    
     let config_file = conf::load_config("./config.yaml").unwrap();
     let db = conf::build_db(&config_file, true).await;
     let _ = db.collection::<mongodb::bson::Document>("filters").insert_one(filter_obj);
-    
 }
 
 // remove test filter with filter_id -1 from the database
