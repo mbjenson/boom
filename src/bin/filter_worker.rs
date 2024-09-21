@@ -109,6 +109,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
         let start = std::time::Instant::now();
 
         let out_documents = filter.run(candids, &db).await.unwrap();
+        if out_documents.len() == 0 {
+            continue;
+        }
 
         // convert the documents to a format that any other worker (even in python) can read
         // for that we can deserialize the Document to json
