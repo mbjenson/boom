@@ -1,5 +1,5 @@
 use boom::{filter, conf};
-use std::{num::NonZero};
+use std::{any::Any, num::NonZero};
 mod testing_util;
 use testing_util::{self as tu};
 use mongodb::bson::{Document, doc};
@@ -112,17 +112,18 @@ async fn test_filter_no_alerts() {
     }
 }
 
-// #[tokio::test]
-// async fn test_no_filter_found() {
-//     let config_file = conf::load_config("./config.yaml").unwrap();
-//     let db = conf::build_db(&config_file, true).await;
-//     let thisfilter = filter::Filter::build(-1, &db).await;
-//     match thisfilter {
-//         Err(e) => {
-//             println!("error: {}", e);
-//         },
-//         _ => {
-//             panic!("Was supposed to get error");
-//         }
-//     }
-// }
+#[tokio::test]
+async fn test_no_filter_found() {
+    let config_file = conf::load_config("./config.yaml").unwrap();
+    let db = conf::build_db(&config_file, true).await;
+    let thisfilter = filter::Filter::build(-1, &db).await;
+    match thisfilter {
+        Err(e) => {
+            assert!(e.is::<filter::FilterError>());
+            println!("error: {}", e);
+        },
+        _ => {
+            panic!("Was supposed to get error");
+        }
+    }
+}
