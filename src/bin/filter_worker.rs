@@ -51,8 +51,18 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let mut con = client_redis
         .get_multiplexed_async_connection().await.unwrap();
     
+    // (OLD) let mut filter = filter::Filter::build(filter_id, &db).await?;
+
     // build filter
-    let mut filter = filter::Filter::build(filter_id, &db).await?;
+    let mut filter = match filter::Filter::build(filter_id, &db).await {
+        Ok(filter) => {
+            filter
+        },
+        Err(e) => {
+            println!("got error: {}", e);
+            return Err(e);
+        }
+    };
 
     println!("Starting filter worker for filter {}", filter_id);
 

@@ -1,8 +1,18 @@
-use std::error::Error;
+use std::{error::Error, fmt};
 use mongodb::bson::{doc, Document};
 use futures::stream::StreamExt;
 
 const ALLOWED_CATALOGS: [&str; 1] = ["ZTF_alerts"];
+
+#[derive(Debug)]
+pub struct FilterError;
+
+impl Error for FilterError {}
+impl fmt::Display for FilterError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Filter Error")
+    }
+}
 
 pub struct Filter {
     pub pipeline: Vec<Document>,
@@ -55,14 +65,20 @@ impl Filter {
                 }
             }]
         ).await;
+
         if let Err(e) = filter_obj {
             println!("Got ERROR when retrieving filter from database: {}", e);
             return Result::Err(Box::new(e));
         }
 
         // get document from cursor
-        let filter_obj = filter_obj
-            .unwrap().deserialize_current().unwrap();
+        let mut filter_obj = filter_obj.unwrap();
+        let advance = filter_obj.advance().await.unwrap();
+        let filter_obj = if advance {
+            filter_obj.deserialize_current().unwrap()
+        } else {
+            return Err(Box::new(FilterError));
+        };
 
         let catalog = filter_obj.get("catalog")
             .unwrap().as_str().unwrap();
