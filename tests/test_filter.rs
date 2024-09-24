@@ -1,5 +1,5 @@
 use boom::{filter, conf};
-use std::{any::Any, num::NonZero};
+use std::num::NonZero;
 mod testing_util;
 use testing_util::{self as tu};
 use mongodb::bson::{Document, doc};
@@ -98,7 +98,7 @@ async fn test_filter_no_alerts() {
         Ok(candids) => {
             let out_candids = thisfilter.run(candids.clone(), &db).await;
             match out_candids {
-                Ok(out) => {
+                Ok(_) => {
                     println!("everything is ok!");
                 },
                 Err(e) => {
@@ -116,7 +116,7 @@ async fn test_filter_no_alerts() {
 async fn test_no_filter_found() {
     let config_file = conf::load_config("./config.yaml").unwrap();
     let db = conf::build_db(&config_file, true).await;
-    let thisfilter = filter::Filter::build(-1, &db).await;
+    let thisfilter = filter::Filter::build(-2, &db).await;
     match thisfilter {
         Err(e) => {
             assert!(e.is::<filter::FilterError>());
@@ -125,5 +125,22 @@ async fn test_no_filter_found() {
         _ => {
             panic!("Was supposed to get error");
         }
+    }
+}
+
+#[tokio::test]
+async fn test_filter_found() {
+    let config_file = conf::load_config("./config.yaml").unwrap();
+    let db = conf::build_db(&config_file, true).await;
+    tu::insert_test_filter().await;
+    let thisfilter = filter::Filter::build(-1, &db).await;
+    tu::remove_test_filter().await;
+    match thisfilter {
+        Ok(_) => {
+            println!("successfully got filter from db");
+        }
+        Err(e) => {
+            panic!("ERROR, was supposed to find filter in database. {}", e);
+        },
     }
 }
