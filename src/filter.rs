@@ -5,12 +5,14 @@ use futures::stream::StreamExt;
 const ALLOWED_CATALOGS: [&str; 1] = ["ZTF_alerts"];
 
 #[derive(Debug)]
-pub struct FilterError;
+pub struct FilterError {
+    message: String,
+}
 
 impl Error for FilterError {}
 impl fmt::Display for FilterError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Filter Error")
+        write!(f, "Filter Error {}", self.message)
     }
 }
 
@@ -77,7 +79,7 @@ impl Filter {
         let filter_obj = if advance {
             filter_obj.deserialize_current().unwrap()
         } else {
-            return Err(Box::new(FilterError));
+            return Err(Box::new(FilterError { message: format!("Filter {} not found in database", filter_id)}));
         };
 
         let catalog = filter_obj.get("catalog")
@@ -193,13 +195,14 @@ impl Filter {
     pub async fn run(
         &mut self, candids: Vec<i64>, db: &mongodb::Database,
     ) -> Result<Vec<Document>, Box<dyn Error>> {
-        
-        if self.pipeline.len() == 0 {
-            panic!("filter pipeline is empty, ensure filter has been built before running");
-        }
+
         if candids.len() == 0 {
             return Ok(vec![]);
         }
+        if self.pipeline.len() == 0 {
+            panic!("filter pipeline is empty, ensure filter has been built before running");
+        }
+
         // insert candids into filter
         self.pipeline[0].insert("$match", doc! {
             "candid": doc! {

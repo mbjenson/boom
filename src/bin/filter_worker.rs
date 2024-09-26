@@ -108,17 +108,16 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     loop {
         // check if worker has been interrupted
-        let should_exit: bool = match interrupt.try_lock() {
-            Ok(x) => { *x },
-            Err(_) => { false }
+        match interrupt.try_lock() {
+            Ok(x) => {
+                if *x { return Ok(()); }
+            },
+            _ => {}
         };
 
         let candids = get_candids_from_stream(&mut con, &redis_stream, &opts).await;
         if candids.len() == 0 {
             println!("Queue empty");
-            if should_exit {
-                return Ok(())
-            }
             tokio::time::sleep(tokio::time::Duration::from_secs(3)).await;
             continue;
         }
@@ -141,10 +140,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
         }).collect();
         con.lpush::<&str, &Vec<String>, isize>(&filter_results_queue, &out_documents).await.unwrap();
 
-        println!("{}/{} alerts passed filter {} in {}s", out_documents.len(), in_count, filter_id, start.elapsed().as_secs_f64());
-
-        if should_exit {
-            return Ok(())
-        }
+        println!(
+            "{}/{} alerts passed filter {} in {}s", 
+            out_documents.len(), in_count, filter_id, start.elapsed().as_secs_f64());
     }
 }
