@@ -93,12 +93,6 @@ async fn main() -> Result<(), Box<dyn Error>> {
         }
     }
 
-    // print!("build all filters: Filter ids:\n");
-    // for filter in filter_table[&1].iter() {
-    //     print!("{}, ", filter.id);
-    // }
-    // println!("");
-
     // initialize redis streams based on permission levels
     let mut redis_streams = HashMap::new();
     for filter_vec in filter_table.values() {
@@ -116,15 +110,6 @@ async fn main() -> Result<(), Box<dyn Error>> {
     // as well as to allow multiple workers to read from the same stream for a given filter,
     // which let's us scale the number of workers per filter if needed in the future
     // https://medium.com/redis-with-raphael-de-lio/understanding-redis-streams-33aa96ca7206
-
-    
-    // for filter_id in consumer_groups.keys() {
-    //     let opts = StreamReadOptions::default()
-    //         .group(&consumer_groups[filter_id], "worker_1")
-    //         .count(100);
-    //     read_options.insert(filter_id, opts);
-    // }
-    // let mut consumer_gro`ups: HashMap<i32, String> = HashMap::new();
 
     // create consumer groups, read_options, and output queues for each filter
     let mut read_options = HashMap::new();
@@ -152,51 +137,6 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 format!("filter_{filter_id}_results", filter_id = filter.id));
         }
     }
-
-    // println!("consumer groups:");
-    // for group in consumer_groups.values() {
-    //     println!("{}", group);
-    // }
-    // println!("result queues:");
-    // for (id, queue) in &filter_results_queues {
-    //     println!("({}, {:?})", id, queue);
-    // }
-    // println!("");
-
-    // println!("created {} consumer groups: {:?}", consumer_groups.len(), consumer_groups);
-    // println!("create {} filter_results_queues: {:?}", filter_results_queues.len(), filter_results_queues);
-
-
-    // create StreamReadOptions table
-    // let mut read_options = HashMap::new();
-    // for filter_id in consumer_groups.keys() {
-    //     let opts = StreamReadOptions::default()
-    //         .group(&consumer_groups[filter_id], "worker_1")
-    //         .count(100);
-    //     read_options.insert(filter_id, opts);
-    // }
-
-    // println!("created {} read options: {:?}", read_options.len(), read_options);   
-
-    /*
-    * MULTIPLE FILTER WORKER EXPLANATION
-    * The ml_worker creates 3 streams, split up by permissions (perm 1 has most access, perm 3 least)
-    * i.e. ZTF_alerts_programid_1_filter_stream contains all alerts which are in permission level 1 or under
-    *    & ZTF_alerts_programid_3_filter_stream contains only alerts which are permission level 3
-    * Having these three streams makes it easy to run filters on data for any permission level
-    * To work with this properly, the filters must be grouped by permission level.
-    * For example, lets say we have 5 filters, filters 1, 2, and 3 are permission level 2. And lets
-    *   say that filters 4 and 5 are permission level 1. then, naturally, we group 1, 2, and 3 together
-    *   and 4 and 5 together.
-    *   Next, we will select the first non-empty permission filter group from our table. With this group
-    *   in hand, we get our alerts from the stream corresponding to the filter group we have chosen. Lets 
-    *   say that we chose programid (permission) 1. So we get some alerts from 
-    *   ZTF_alerts_programid_1_filter_stream and sequentially run each of our permission level 1 filters on
-    *   those alerts candids we got from the stream (grab the candids from the stream once and then pass
-    *   a copy of that data into the filter.run() function). After we run each filter, the resulting data
-    *   is sent to the corresponding redis queue for that filter.
-
-     */
 
     // keep track of how many streams are empty in order to take breaks
     let mut empty_stream_counter: usize = 0;
