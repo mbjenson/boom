@@ -9,6 +9,7 @@ use std::{
 };
 
 use boom::{conf, filter};
+use boom::util;
 
 async fn get_candids_from_stream(con: &mut redis::aio::MultiplexedConnection, stream: &str, options: &StreamReadOptions) -> Vec<i64> {
     let result: Option<StreamReadReply> = con.xread_options(
@@ -37,16 +38,6 @@ async fn get_candids_from_stream(con: &mut redis::aio::MultiplexedConnection, st
     candids
 }
 
-// intercepts interrupt signals and sets boolean to true
-async fn sig_int_handler(v: Arc<Mutex<bool>>) {
-    tokio::spawn(async move {
-        tokio::signal::ctrl_c().await.unwrap();
-        println!("Filter worker interrupted. Finishing up...");
-        let mut v = v.try_lock().unwrap();
-        *v = true;
-    });
-}
-
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     let catalog = "ZTF";
@@ -64,7 +55,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     // setup signal handler thread
     let interrupt = Arc::new(Mutex::new(false));
-    sig_int_handler(Arc::clone(&interrupt)).await;
+    util::sig_int_handler(Arc::clone(&interrupt)).await;
 
     // connect to mongo and redis
     let config_file = conf::load_config("./config.yaml").unwrap();
@@ -143,12 +134,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     loop {
         // check if worker has been interrupted
-        match interrupt.try_lock() {
-            Ok(x) => {
-                if *x { return Ok(()); }
-            },
-            _ => {}
-        };
+        util::check_exit(Arc::clone(&interrupt));
 
         for (perm, filters) in &mut filter_table {
             for filter in filters {
@@ -191,5 +177,6 @@ async fn main() -> Result<(), Box<dyn Error>> {
             tokio::time::sleep(tokio::time::Duration::from_secs(3)).await;
         }
         empty_stream_counter = 0;
+        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
     }
 }
