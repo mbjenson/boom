@@ -1,6 +1,6 @@
 use redis::AsyncCommands;
 use std::env;
-use boom::{worker_utils, conf, alert, types::ztf_alert_schema};
+use boom::{worker_util, conf, alert, types::ztf_alert_schema};
 use std::sync::{Arc, Mutex};
 
 #[tokio::main]
@@ -16,7 +16,7 @@ async fn main() {
     }
 
     let interrupt_flag = Arc::new(Mutex::new(false));
-    worker_utils::sig_int_handler(Arc::clone(&interrupt_flag)).await;
+    worker_util::sig_int_handler(Arc::clone(&interrupt_flag)).await;
 
     let stream_name = &args[1];
 
@@ -69,7 +69,7 @@ async fn main() {
     let start = std::time::Instant::now();
     loop {
         // check for interruption signal
-        worker_utils::check_exit(Arc::clone(&interrupt_flag)); 
+        worker_util::check_exit(Arc::clone(&interrupt_flag)); 
         // retrieve candids from redis
         let result: Option<Vec<Vec<u8>>> = con.rpoplpush(&queue_name, &queue_temp_name).await.unwrap();
         match result {

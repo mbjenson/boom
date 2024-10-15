@@ -6,7 +6,7 @@ use std::{
     collections::HashMap,
 };
 
-use boom::{conf, filter, worker_utils};
+use boom::{conf, filter, worker_util};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
@@ -25,7 +25,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     // setup signal handler thread
     let interrupt = Arc::new(Mutex::new(false));
-    worker_utils::sig_int_handler(Arc::clone(&interrupt)).await;
+    worker_util::sig_int_handler(Arc::clone(&interrupt)).await;
 
     // connect to mongo and redis
     let config_file = conf::load_config("tests/config.test.yaml").unwrap();
@@ -104,11 +104,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     loop {
         // check if worker has been interrupted
-        worker_utils::check_exit(Arc::clone(&interrupt));
+        worker_util::check_exit(Arc::clone(&interrupt));
 
         for (perm, filters) in &mut filter_table {
             for filter in filters {
-                let candids = worker_utils::get_candids_from_stream(
+                let candids = worker_util::get_candids_from_stream(
                     &mut con,
                     &redis_streams[&perm],
                     &read_options[&filter.id]).await;
