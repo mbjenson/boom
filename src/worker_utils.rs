@@ -4,7 +4,7 @@ use std::sync::{Mutex, Arc};
 pub async fn sig_int_handler(flag: Arc<Mutex<bool>>) {
     tokio::spawn(async move {
         tokio::signal::ctrl_c().await.unwrap();
-        println!("Filter worker interrupted. Finishing up...");
+        println!("Received interrupt signal. Finishing up...");
         let mut flag = flag.try_lock().unwrap();
         *flag = true;
     });

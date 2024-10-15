@@ -8,7 +8,7 @@ use std::{
     collections::HashMap,
 };
 
-use boom::{conf, filter, util};
+use boom::{conf, filter, worker_utils};
 
 async fn get_candids_from_stream(con: &mut redis::aio::MultiplexedConnection, stream: &str, options: &StreamReadOptions) -> Vec<i64> {
     let result: Option<StreamReadReply> = con.xread_options(
@@ -54,7 +54,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     // setup signal handler thread
     let interrupt = Arc::new(Mutex::new(false));
-    util::sig_int_handler(Arc::clone(&interrupt)).await;
+    worker_utils::sig_int_handler(Arc::clone(&interrupt)).await;
 
     // connect to mongo and redis
     let config_file = conf::load_config("./config.yaml").unwrap();
@@ -133,7 +133,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     loop {
         // check if worker has been interrupted
-        util::check_exit(Arc::clone(&interrupt));
+        worker_utils::check_exit(Arc::clone(&interrupt));
 
         for (perm, filters) in &mut filter_table {
             for filter in filters {
