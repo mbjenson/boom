@@ -1,6 +1,4 @@
-use redis::AsyncCommands;
-use redis::streams::{StreamReadOptions,StreamReadReply};
-use std::borrow::Borrow;
+use redis::{AsyncCommands, streams::StreamReadOptions};
 use std::{
     env, 
     error::Error,
@@ -9,33 +7,6 @@ use std::{
 };
 
 use boom::{conf, filter, worker_utils};
-
-async fn get_candids_from_stream(con: &mut redis::aio::MultiplexedConnection, stream: &str, options: &StreamReadOptions) -> Vec<i64> {
-    let result: Option<StreamReadReply> = con.xread_options(
-        &[stream.to_owned()], &[">"], options).await.unwrap();
-    let mut candids: Vec<i64> = Vec::new();
-    if let Some(reply) = result {
-        for stream_key in reply.keys {
-            let xread_ids = stream_key.ids;
-            for stream_id in xread_ids {
-                let candid = stream_id.map.get("candid").unwrap();
-                // candid is a Value type, so we need to convert it to i64
-                match candid {
-                    redis::Value::BulkString(x) => {
-                        // then x is a Vec<u8> type, so we need to convert it an i64
-                        let x = String::from_utf8(x.to_vec()).unwrap().parse::<i64>().unwrap();
-                        // append to candids
-                        candids.push(x);
-                    },
-                    _ => {
-                        println!("Candid unknown type: {:?}", candid);
-                    }
-                }
-            }
-        }
-    }
-    candids
-}
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
@@ -137,7 +108,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
         for (perm, filters) in &mut filter_table {
             for filter in filters {
-                let candids = get_candids_from_stream(
+                let candids = worker_utils::get_candids_from_stream(
                     &mut con,
                     &redis_streams[&perm],
                     &read_options[&filter.id]).await;
@@ -176,6 +147,5 @@ async fn main() -> Result<(), Box<dyn Error>> {
             tokio::time::sleep(tokio::time::Duration::from_secs(3)).await;
         }
         empty_stream_counter = 0;
-        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
     }
 }
