@@ -8,8 +8,7 @@ use std::{
     collections::HashMap,
 };
 
-use boom::{conf, filter};
-use boom::util;
+use boom::{conf, filter, util};
 
 async fn get_candids_from_stream(con: &mut redis::aio::MultiplexedConnection, stream: &str, options: &StreamReadOptions) -> Vec<i64> {
     let result: Option<StreamReadReply> = con.xread_options(
