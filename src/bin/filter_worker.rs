@@ -25,7 +25,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     // setup signal handler thread
     let interrupt = Arc::new(Mutex::new(false));
-    worker_util::sig_int_handler(Arc::clone(&interrupt)).await;
+    worker_util::sig_int_handler(Arc::clone(&interrupt), "filter worker".to_string()).await;
 
     // connect to mongo and redis
     let config_file = conf::load_config("config.yaml").unwrap();

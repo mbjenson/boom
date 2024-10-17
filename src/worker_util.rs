@@ -3,10 +3,10 @@ use redis::AsyncCommands;
 use redis::streams::{StreamReadOptions, StreamReadReply};
 
 // spawns a thread which listens for interrupt signal. Sets flag to true upon signal interruption
-pub async fn sig_int_handler(flag: Arc<Mutex<bool>>) {
+pub async fn sig_int_handler(flag: Arc<Mutex<bool>>, proc_name: String) {
     tokio::spawn(async move {
         tokio::signal::ctrl_c().await.unwrap();
-        println!("Received interrupt signal. Finishing up...");
+        println!("Received interrupt signal. {} is finishing up...", proc_name);
         let mut flag = flag.try_lock().unwrap();
         *flag = true;
     });

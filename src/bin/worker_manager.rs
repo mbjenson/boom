@@ -8,6 +8,7 @@ use std::{
     sync::{Arc, Mutex},
     collections::HashMap,
 };
+use nix;
 
 use boom::worker_util;
 
@@ -37,6 +38,9 @@ have the ML worker dump some kind of metric into a file which can be read to det
 data throughput and adjust the worker count accordingly. Or (2) the ml_workers
 outputted data streams could be queried for data throughput metrics somehow.
 
+> Additions that need to be made
+1. add a place to display how many workers are currently active and of which types
+
 */
 
 
@@ -54,7 +58,7 @@ async fn exit_workers(workers: &mut HashMap<(), std::process::Child>) -> Result<
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     let interrupt = Arc::new(Mutex::new(false));
-    worker_util::sig_int_handler(Arc::clone(&interrupt)).await;
+    worker_util::sig_int_handler(Arc::clone(&interrupt), "manager".to_string()).await;
     // REDIS
     let client_redis = redis::Client::open(
         "redis://localhost:6379".to_string()
@@ -92,13 +96,20 @@ async fn main() -> Result<(), Box<dyn Error>> {
         //     },
         //     _ => {}
         // }
+
+        
         
         match interrupt.try_lock() {
             Ok(stop) => {
                 if *stop {
                     for (_, worker_vec) in worker_table {
-                        for mut worker in worker_vec {
-                            worker.kill().unwrap();
+                        
+                        for worker in worker_vec {
+                            nix::sys::signal::kill(
+                                nix::unistd::Pid::from_raw(worker.id() as i32),
+                                nix::sys::signal::Signal::SIGINT
+                            ).expect("cannot send ctrl-c");
+                            // worker.kill().unwrap();
                         }
                     }
                     return Ok(());

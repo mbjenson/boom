@@ -16,7 +16,7 @@ async fn main() {
     }
 
     let interrupt_flag = Arc::new(Mutex::new(false));
-    worker_util::sig_int_handler(Arc::clone(&interrupt_flag)).await;
+    worker_util::sig_int_handler(Arc::clone(&interrupt_flag), "alert worker".to_string()).await;
 
     let stream_name = &args[1];
 
