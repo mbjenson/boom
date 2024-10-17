@@ -18,7 +18,6 @@ interruption_flag = False
 
 def signal_handler(signum, frame):
     signal.signal(signum, signal.SIG_IGN)
-    print("sig int received, finishing up...")
     global interruption_flag
     interruption_flag = True
 
@@ -57,6 +56,7 @@ if __name__ == "__main__":
 
     while True:
         if interruption_flag:
+            print("sig int received, ml worker n finishing up...")
             exit(0)
 
         start = time.time()
