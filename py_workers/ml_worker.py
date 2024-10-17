@@ -26,7 +26,7 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--config", type=str, default="config.default.yaml", help="Path to the config file")
+    parser.add_argument("--config", type=str, default="config.yaml", help="Path to the config file")
     parser.add_argument("--stream", type=str, default="ZTF", help="Stream to process")
     args = parser.parse_args()
 
