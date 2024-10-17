@@ -6,8 +6,10 @@ use redis::AsyncCommands;
 use std::{
     error::Error,
     sync::{Arc, Mutex},
-    collections::HashMap
+    collections::HashMap,
 };
+
+use boom::worker_util;
 
 /*
 > multi-worker-manager
@@ -40,20 +42,19 @@ outputted data streams could be queried for data throughput metrics somehow.
 
 // total_outgoing += con.llen::<&str, isize>("ZTF_alerts_classifier_queue").await.unwrap() as i64;
 
-// handle ctrl+c
-async fn sig_int_handler(flag: Arc<Mutex<bool>>) {
-    tokio::spawn(async move {
-        tokio::signal::ctrl_c().await.unwrap();
-        println!("manager interrupted. stopping workers...");
-        let mut flag = flag.try_lock().unwrap();
-        *flag = true;
-    });
+
+// send 
+async fn exit_workers(workers: &mut HashMap<(), std::process::Child>) -> Result<(), Box<dyn Error>> {
+    for worker in workers.values_mut() {
+        worker.kill().expect("worker could not be killed")
+    }
+    Ok(())
 }
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     let interrupt = Arc::new(Mutex::new(false));
-    sig_int_handler(Arc::clone(&interrupt)).await;
+    worker_util::sig_int_handler(Arc::clone(&interrupt)).await;
     // REDIS
     let client_redis = redis::Client::open(
         "redis://localhost:6379".to_string()
@@ -83,6 +84,15 @@ async fn main() -> Result<(), Box<dyn Error>> {
     worker_table.entry("filter").and_modify(|workers| workers.push(filter_worker));
     
     loop {
+        // match interrupt.try_lock() {
+        //     Ok(flag) => {
+        //         if *flag {
+        //             exit_children()
+        //         }
+        //     },
+        //     _ => {}
+        // }
+        
         match interrupt.try_lock() {
             Ok(stop) => {
                 if *stop {

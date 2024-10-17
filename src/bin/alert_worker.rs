@@ -24,7 +24,7 @@ async fn main() {
         conf::load_config(&args[2]).unwrap()
     } else {
         println!("No config file provided, using default config.default.yaml");
-        conf::load_config("./config.default.yaml").unwrap()
+        conf::load_config("config.yaml").unwrap()
     };
 
     // XMATCH CONFIGS
