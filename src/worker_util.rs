@@ -22,6 +22,20 @@ pub fn check_exit(flag: Arc<Mutex<bool>>) {
     }
 }
 
+// checks returns value of flag
+pub fn check_flag(flag: Arc<Mutex<bool>>) -> bool {
+    match flag.try_lock() {
+        Ok(x) => {
+            if *x {
+                true
+            } else {
+                false
+            }
+        },
+        _ => { false }
+    }
+}
+
 pub async fn get_candids_from_stream(con: &mut redis::aio::MultiplexedConnection, stream: &str, options: &StreamReadOptions) -> Vec<i64> {
     let result: Option<StreamReadReply> = con.xread_options(
         &[stream.to_owned()], &[">"], options).await.unwrap();
