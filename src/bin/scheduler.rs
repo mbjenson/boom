@@ -1,18 +1,103 @@
+use core::time;
 use std::{
-    collections::HashMap, error::Error, fmt, string, sync::{mpsc, Arc, Mutex}, thread::{self, JoinHandle}
+    collections::HashMap, 
+    error::Error, 
+    fmt, 
+    num::NonZero, 
+    sync::{mpsc, Arc, Mutex}, 
+    thread
 };
-use futures::executor;
-use futures;
-use boom::{types::Alert, worker_util};
-use rdkafka::message::Header;
-use tokio::{self, sync::{broadcast::error, watch::Receiver}};
-use redis::{AsyncCommands, streams::StreamReadOptions};
-use std::env;
-use boom::{filter, conf, alert, types::ztf_alert_schema};
+use futures::StreamExt;
+use redis::{streams::StreamReadOptions, AsyncCommands};
+use mongodb::bson::{doc, Document};
+use boom::{filter, conf, alert, types::ztf_alert_schema, worker_util};
 
-// TODO: implement fake ml_worker which takes in alerts, opens streams, and sends candids 
-//       to streams without running any ml.
+// fake ml worker which, like the ML worker, receives alerts from the alert worker and sends them
+//      to streams
+#[tokio::main]
+async fn fake_ml_worker(id: String, receiver: Arc<Mutex<mpsc::Receiver<WorkerCmd>>>) {
 
+    let ztf_allowed_permissions = vec![1, 2, 3];
+    let catalog = "ZTF";
+    let queue = format!("{}_alerts_classifier_queue", catalog);
+
+    let config_file = conf::load_config("config.yaml").unwrap();
+    let db = conf::build_db(&config_file).await;
+    let client_redis = redis::Client::open(
+        "redis://localhost:6379".to_string()).unwrap();
+    let mut con = client_redis
+        .get_multiplexed_async_connection().await.unwrap();
+    
+    loop {
+        // check for interrupt from thread pool
+        if let Ok(command) = receiver.lock().unwrap().try_recv() {
+            match command {
+                WorkerCmd::TERM => {
+                    println!("alert worker {} received termination command", id);
+                    return;
+                },
+            }
+        }
+
+        let candids = con
+            .rpop::<&str, Vec<i64>>(queue.as_str(), NonZero::new(1000)).await.unwrap();
+
+        let mut alert_cursor = db
+            .collection::<Document>(format!("{}_alerts", catalog).as_str())
+            .find(doc!{"candid": {"$in": candids}}).await.unwrap();
+
+        let mut alerts: Vec<Document> = Vec::new();
+        while let Some(result) = alert_cursor.next().await {
+            match result {
+                Ok(document) => {
+                    alerts.push(document);
+                }
+                _ => {
+                    continue;
+                }
+            }
+        }
+
+        if alerts.len() == 0 {
+            println!("ML WORKER {}: queue empty", id);
+            thread::sleep(time::Duration::from_secs(5));
+            continue;
+        } else {
+            println!("ML WORKER {}: received alerts len: {}", id, alerts.len());
+        }
+
+        let mut candids_grouped: HashMap<i32, Vec<i64>> = 
+            HashMap::new();
+
+        for alert in alerts {
+            let candidate = alert.get("candidate").unwrap();
+            let programid = mongodb::bson::to_document(candidate)
+                .unwrap().get("programid").unwrap().as_i32().unwrap();
+            let candid = alert.get("candid").unwrap().as_i64().unwrap();
+            if !candids_grouped.contains_key(&programid) {
+                candids_grouped.insert(programid, Vec::new());
+            } else {
+                candids_grouped
+                    .entry(programid)
+                    .and_modify(|candids| candids.push(candid));
+            }
+        }
+
+        for (programid, candids) in candids_grouped {
+            for candid in candids {
+                for permission in &ztf_allowed_permissions {
+                    if programid <= *permission {
+                        let _ = con.xadd::<&str, &str, &str, i64, ()>(
+                            format!("{}_alerts_programid_{}_filter_stream", &catalog, permission).as_str(),
+                            "*",
+                            &[("candid", candid)]
+                        ).await;
+                    }
+                }
+            }
+        }
+    }
+}
 
 #[tokio::main]
 async fn filter_worker(id: String, receiver: Arc<Mutex<mpsc::Receiver<WorkerCmd>>>) -> Result<(), Box<dyn Error>> {
@@ -108,7 +193,7 @@ async fn filter_worker(id: String, receiver: Arc<Mutex<mpsc::Receiver<WorkerCmd>
                 },
             }
         }
-
+        
         for (perm, filters) in &mut filter_table {
             for filter in filters {
                 let candids = worker_util::get_candids_from_stream(
@@ -146,7 +231,7 @@ async fn filter_worker(id: String, receiver: Arc<Mutex<mpsc::Receiver<WorkerCmd>
             }
         }
         if empty_stream_counter == filter_ids.len() {
-            println!("All streams empty");
+            println!("FILTER WORKER {}: All streams empty", id);
             tokio::time::sleep(tokio::time::Duration::from_secs(3)).await;
         }
         empty_stream_counter = 0;
@@ -264,7 +349,7 @@ async fn alert_worker(id: String, receiver: Arc<Mutex<mpsc::Receiver<WorkerCmd>>
                 count += 1;
             }
             None => {
-                println!("Queue is empty");
+                println!("ALERT WORKER {}: Queue is empty", id);
                 tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
             }
         }
@@ -424,6 +509,11 @@ impl Worker {
                     filter_worker(id, receiver);
                 })
             },
+            WorkerType::ML => {
+                thread::spawn(|| {
+                    fake_ml_worker(id, receiver);
+                })
+            }
             _ => {
                 panic!("worker type not yet implemnted");
             }
@@ -466,11 +556,12 @@ async fn main() {
     let interrupt = Arc::new(Mutex::new(false));
     worker_util::sig_int_handler(Arc::clone(&interrupt)).await;
     
-    // let alert_pool = ThreadPool::new(WorkerType::Alert, 3);
+    println!("creating alert, ml, and filter workers...");
+    let alert_pool = ThreadPool::new(WorkerType::Alert, 3);
+    let ml_pool = ThreadPool::new(WorkerType::ML, 3);
     let filter_pool = ThreadPool::new(WorkerType::Filter, 3);
-    // let ml_pool = ThreadPool::new(WorkerType::ML, 3);
+    println!("created workers");
 
-    // println!("spawned in 1 worker of each type");
     loop {
         let exit = worker_util::check_flag(Arc::clone(&interrupt));
         println!("heart beat (MAIN)");
@@ -479,11 +570,9 @@ async fn main() {
         thread::sleep(std::time::Duration::from_secs(1));
         if exit {
             println!("killed thread(s)");
-            // drop(alert_pool);
+            drop(alert_pool);
+            drop(ml_pool);
             drop(filter_pool);
-            // drop(ml_pool);
-
-            // let _ = v.into_iter().map(|x| x.join());
             break;
         }
     }
