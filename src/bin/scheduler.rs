@@ -5,7 +5,8 @@ use std::{
     fmt, 
     num::NonZero, 
     sync::{mpsc, Arc, Mutex}, 
-    thread
+    thread,
+    env
 };
 use futures::StreamExt;
 use redis::{streams::StreamReadOptions, AsyncCommands};
@@ -15,13 +16,17 @@ use boom::{filter, conf, alert, types::ztf_alert_schema, worker_util};
 // fake ml worker which, like the ML worker, receives alerts from the alert worker and sends them
 //      to streams
 #[tokio::main]
-async fn fake_ml_worker(id: String, receiver: Arc<Mutex<mpsc::Receiver<WorkerCmd>>>) {
-
+async fn fake_ml_worker(
+    id: String, 
+    receiver: Arc<Mutex<mpsc::Receiver<WorkerCmd>>>,
+    stream_name: String,
+    config_path: String,
+) {
     let ztf_allowed_permissions = vec![1, 2, 3];
-    let catalog = "ZTF";
+    let catalog = stream_name;
     let queue = format!("{}_alerts_classifier_queue", catalog);
 
-    let config_file = conf::load_config("config.yaml").unwrap();
+    let config_file = conf::load_config(&config_path).unwrap();
     let db = conf::build_db(&config_file).await;
     let client_redis = redis::Client::open(
         "redis://localhost:6379".to_string()).unwrap();
@@ -100,9 +105,14 @@ async fn fake_ml_worker(id: String, receiver: Arc<Mutex<mpsc::Receiver<WorkerCmd
 }
 
 #[tokio::main]
-async fn filter_worker(id: String, receiver: Arc<Mutex<mpsc::Receiver<WorkerCmd>>>) -> Result<(), Box<dyn Error>> {
-    let catalog = "ZTF";
+async fn filter_worker(
+    id: String,
+    receiver: Arc<Mutex<mpsc::Receiver<WorkerCmd>>>,
+    stream_name: String,
+    config_path: String,
+) -> Result<(), Box<dyn Error>> {
 
+    let catalog = stream_name;
     let filters = vec![3];
     let mut filter_ids: Vec<i32> = Vec::new();
 
@@ -114,7 +124,7 @@ async fn filter_worker(id: String, receiver: Arc<Mutex<mpsc::Receiver<WorkerCmd>
     println!("Starting filter worker for {} with filters {:?}", catalog, filter_ids);
 
     // connect to mongo and redis
-    let config_file = conf::load_config("config.yaml").unwrap();
+    let config_file = conf::load_config(&config_path).unwrap();
     let db = conf::build_db(&config_file).await;
     let client_redis = redis::Client::open(
         "redis://localhost:6379".to_string()).unwrap();
@@ -238,39 +248,18 @@ async fn filter_worker(id: String, receiver: Arc<Mutex<mpsc::Receiver<WorkerCmd>
     }
 }
 
-
-// TODO: include original env::args as func args
 // alert worker as a standalone function which is run by the scheduler
 #[tokio::main]
-async fn alert_worker(id: String, receiver: Arc<Mutex<mpsc::Receiver<WorkerCmd>>>) {
-    // let args: Vec<String> = env::args().collect();
-    // user can pass the path to a config file, but it is optional.
-    // if not provided, we use the default config.default.yaml
-    // the user also needs to pass the name of the alert stream to process
-    // stream name comes first, optional config file comes second
-    // if args.len() < 2 {
-    //     println!("Usage: alert_worker <stream_name> <config_file>, where config_file is optional");
-    //     return;
-    // }
-
-    // let interrupt_flag = Arc::new(Mutex::new(false));
-    // worker_util::sig_int_handler(Arc::clone(&interrupt_flag)).await;
-
-    // let stream_name = &args[1];
-
-    // let config_file = if args.len() > 2 {
-    //     conf::load_config(&args[2]).unwrap()
-    // } else {
-    //     println!("No config file provided, using config.yaml");
-    //     conf::load_config("./config.yaml").unwrap()
-    // };
-    
-
-    let config_file = conf::load_config("./config.yaml").unwrap();
-    let stream_name = "ZTF";
+async fn alert_worker(
+    id: String, 
+    receiver: Arc<Mutex<mpsc::Receiver<WorkerCmd>>>,
+    stream_name: String,
+    config_path: String,
+) {
+    let config_file = conf::load_config(&config_path).unwrap();
 
     // XMATCH CONFIGS
-    let xmatch_configs = conf::build_xmatch_configs(&config_file, stream_name);
+    let xmatch_configs = conf::build_xmatch_configs(&config_file, &stream_name);
 
     // DATABASE
     let db: mongodb::Database = conf::build_db(&config_file).await;
@@ -279,6 +268,7 @@ async fn alert_worker(id: String, receiver: Arc<Mutex<mpsc::Receiver<WorkerCmd>>
         return;
     }
 
+    // create alert and alert-auxillary collections
     let alert_collection = db.collection(&format!("{}_alerts", stream_name));
     let alert_aux_collection = db.collection(&format!("{}_alerts_aux", stream_name));
 
@@ -402,6 +392,8 @@ impl fmt::Display for WorkerType {
 // the use of a messages
 pub struct ThreadPool {
     pub worker_type: WorkerType,
+    pub stream_name: String,
+    pub config_path: String,
     pub workers: HashMap<String, Worker>,
     pub senders: HashMap<String, Option<mpsc::Sender<WorkerCmd>>>,
 }
@@ -409,7 +401,12 @@ pub struct ThreadPool {
 // pub type Message = WorkerCmd;
 
 impl ThreadPool {
-    pub fn new(worker_type: WorkerType, size: usize) -> ThreadPool {
+    pub fn new(
+        worker_type: WorkerType, 
+        size: usize, 
+        stream_name: String,
+        config_path: String
+    ) -> ThreadPool {
         assert!(size > 0);
 
         let mut workers = HashMap::new();
@@ -419,12 +416,20 @@ impl ThreadPool {
             let id = uuid::Uuid::new_v4().to_string();
             let (sender, receiver) = mpsc::channel();
             let receiver = Arc::new(Mutex::new(receiver));
-            workers.insert(id.clone(), Worker::new(worker_type, id.clone(), Arc::clone(&receiver)));
+            workers.insert(id.clone(), Worker::new(
+                worker_type, 
+                id.clone(), 
+                Arc::clone(&receiver),
+                stream_name.clone(),
+                config_path.clone()
+            ));
             senders.insert(id.clone(), Some(sender));
         }
 
         ThreadPool {
             worker_type,
+            stream_name,
+            config_path,
             workers,
             senders,
         }
@@ -449,8 +454,12 @@ impl ThreadPool {
         let receiver = Arc::new(Mutex::new(receiver));
         self.workers.insert(
             id.clone(),
-            Worker::new(self.worker_type, id.clone(),
-            Arc::clone(&receiver)));
+            Worker::new(
+                self.worker_type, id.clone(), 
+                Arc::clone(&receiver),
+                self.stream_name.clone(),
+                self.config_path.clone(),
+            ));
         self.senders.insert(id.clone(), Some(sender));
         println!("Added worker with id: {}", &id);
     }
@@ -494,24 +503,27 @@ pub struct Worker {
 
 impl Worker {
     fn new(
-        worker_type: WorkerType, id: String, 
-        receiver: Arc<Mutex<mpsc::Receiver<WorkerCmd>>>
+        worker_type: WorkerType, 
+        id: String, 
+        receiver: Arc<Mutex<mpsc::Receiver<WorkerCmd>>>,
+        stream_name: String,
+        config_path: String
     ) -> Worker {
         let id_copy = id.clone();
         let thread = match worker_type {
             WorkerType::Alert => {
                 thread::spawn(|| {
-                    alert_worker(id, receiver);
+                    alert_worker(id, receiver, stream_name, config_path);
                 })
             },
             WorkerType::Filter => {
                 thread::spawn(|| {
-                    filter_worker(id, receiver);
+                    filter_worker(id, receiver, stream_name, config_path);
                 })
             },
             WorkerType::ML => {
                 thread::spawn(|| {
-                    fake_ml_worker(id, receiver);
+                    fake_ml_worker(id, receiver, stream_name, config_path);
                 })
             }
             _ => {
@@ -543,23 +555,37 @@ while true {
 }   
 */
 
-
 fn print_pool(pool: &ThreadPool) {
     println!("thread pool of type: {:?}", pool.worker_type);
     println!("num workers: {}", pool.workers.values().len());
 }
 
-
 #[tokio::main]
 async fn main() {
+    // get env::args for stream_name and config_path
+    let args: Vec<String> = env::args().collect();
+    if args.len() < 2 {
+        print!("usage: scheduler <stream_name> <config_path>, where `config_path` is optional");
+        return;
+    }
+
+    let stream_name = args[1].to_string();
+    let config_path = if args.len() > 2 {
+        &args[2]
+    } else {
+        println!("No config file provided, using `config.yaml`");
+        "./config.yaml"
+    }.to_string();
+
     // setup signal handler thread
     let interrupt = Arc::new(Mutex::new(false));
     worker_util::sig_int_handler(Arc::clone(&interrupt)).await;
     
     println!("creating alert, ml, and filter workers...");
-    let alert_pool = ThreadPool::new(WorkerType::Alert, 3);
-    let ml_pool = ThreadPool::new(WorkerType::ML, 3);
-    let filter_pool = ThreadPool::new(WorkerType::Filter, 3);
+    // note: maybe use &str instead of String for stream_name and config_path to reduce clone calls
+    let alert_pool = ThreadPool::new(WorkerType::Alert, 3, stream_name.clone(), config_path.clone());
+    let ml_pool = ThreadPool::new(WorkerType::ML, 3, stream_name.clone(), config_path.clone());
+    let filter_pool = ThreadPool::new(WorkerType::Filter, 3, stream_name.clone(), config_path.clone());
     println!("created workers");
 
     loop {
