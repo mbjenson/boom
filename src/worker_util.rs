@@ -1,4 +1,4 @@
-use std::sync::{Mutex, Arc};
+use std::{sync::{Mutex, Arc}, fmt};
 use redis::AsyncCommands;
 use redis::streams::{StreamReadOptions, StreamReadReply};
 
@@ -61,4 +61,44 @@ pub async fn get_candids_from_stream(con: &mut redis::aio::MultiplexedConnection
         }
     }
     candids
+}
+
+
+#[derive(Clone, Debug)]
+pub enum WorkerType {
+    Alert,
+    Filter,
+    ML,
+}
+
+impl Copy for WorkerType {}
+
+impl fmt::Display for WorkerType {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let enum_str;
+        match self {
+            WorkerType::Alert => { enum_str = "Alert"; },
+            WorkerType::Filter => { enum_str = "Filter" },
+            WorkerType::ML => { enum_str = "ML" },
+            _ => { enum_str = "'display not implemented for this worker type'"; }
+        }
+        write!(f, "{}", enum_str)
+    }
+}
+
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum WorkerCmd {
+    TERM,
+}
+
+impl fmt::Display for WorkerCmd {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let enum_str;
+        match self {
+            WorkerCmd::TERM => { enum_str = "TERM"; },
+            _ => { enum_str = "'display not implemented for this WorkerCmd type'"; }
+        }
+        write!(f, "{}", enum_str)
+    }
 }
