@@ -7,6 +7,13 @@ database:
   username: mongoadmin
   password: mongoadminsecret
   srv: false
+workers:
+  alert:
+    n_workers: 3
+  ml:
+    n_workers: 3
+  filter:
+    n_workers: 3
 crossmatch:
   ZTF:
     - catalog: PS1_DR1
