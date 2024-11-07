@@ -16,7 +16,16 @@ pub struct ThreadPool {
     pub senders: HashMap<String, Option<mpsc::Sender<WorkerCmd>>>,
 }
 
+/// Threadpool
+/// 
+/// The threadpool manages an array of workers of one type
 impl ThreadPool {
+    /// Create a new threadpool
+    /// 
+    /// worker_type: a `WorkerType` enum to designate which type of workers this threadpool contains
+    /// size: number of workers initially inside of threadpool
+    /// stream_name: source stream. e.g. 'ZTF'
+    /// config_path: path to config file
     pub fn new(
         worker_type: WorkerType, 
         size: usize, 
@@ -51,6 +60,9 @@ impl ThreadPool {
         }
     }
 
+    /// remove a worker from the thread pool by id
+    ///
+    /// id: string identifier for the worker to be removed
     pub fn remove_worker(&mut self, id: String) {
         if let Some(sender) = &self.senders[&id] {
             sender.send(WorkerCmd::TERM).unwrap();
@@ -64,6 +76,7 @@ impl ThreadPool {
         }
     }
 
+    // add a new worker to the thread pool
     pub fn add_worker(&mut self) {
         let id = uuid::Uuid::new_v4().to_string();
         let (sender, receiver) = mpsc::channel();
@@ -81,6 +94,7 @@ impl ThreadPool {
     }
 }
 
+// shut down all workers from the thread pool and drop the threadpool
 impl Drop for ThreadPool {
     fn drop(&mut self) {
         println!("Sending terminate message to all workers.");
@@ -104,20 +118,24 @@ impl Drop for ThreadPool {
     }
 }
 
-
-/*
-Worker Struct
-When creating a worker a `WorkerType` must be specified.
-The worker of that type is then created. A worker will
-run a specific function whichs is the worker.
-*/
-
+/// Worker Struct
+/// The `worker` struct represents a threaded worker which might serve as
+/// one of several possible roles in the processing pipeline. A `worker` is
+/// controlled completely by a threadpool and has a listening channel through
+/// which it listens for commands from it.
 pub struct Worker {
     pub id: String,
     pub thread: Option<thread::JoinHandle<()>>,
 }
 
 impl Worker {
+    /// Create a new pipeline worker
+    /// 
+    /// worker_type: an instance of enum `WorkerType`
+    /// id: unique string identifier
+    /// receiver: receiver by which the owning threadpool communicates with the worker
+    /// stream_name: name of the stream worker from. e.g. 'ZTF' or 'WINTER'
+    /// config_path: path to the config file we are working with
     fn new(
         worker_type: WorkerType, 
         id: String, 
