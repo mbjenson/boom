@@ -31,6 +31,9 @@ pub async fn filter_worker(
         "redis://localhost:6379".to_string()).unwrap();
     let mut con = client_redis
         .get_multiplexed_async_connection().await.unwrap();
+
+    let mut alert_counter = 0;
+    let command_interval = worker_util::get_check_command_interval(config_file);
     
     // build filters and organize by permission level
     let mut filter_table: HashMap<i64, Vec<filter::Filter>> = HashMap::new();
@@ -96,12 +99,16 @@ pub async fn filter_worker(
 
     loop {
         // check for command from threadpool
-        if let Ok(command) = receiver.lock().unwrap().try_recv() {
-            match command {
-                WorkerCmd::TERM => {
-                    println!("alert worker {} received termination command", id);
-                    return Ok(());
-                },
+        if alert_counter - command_interval > 0 {
+            println!("filter worker checking for TERM");
+            alert_counter = 0;
+            if let Ok(command) = receiver.lock().unwrap().try_recv() {
+                match command {
+                    WorkerCmd::TERM => {
+                        println!("alert worker {} received termination command", id);
+                        return Ok(());
+                    },
+                }
             }
         }
         
@@ -116,6 +123,7 @@ pub async fn filter_worker(
                     continue;
                 }
                 let in_count = candids.len();
+                alert_counter += in_count as i64;
 
                 println!("got {} candids from redis stream for filter {}", in_count, redis_streams[&perm]);
                 println!("running filter with id {} on {} alerts", filter.id, in_count);
@@ -142,8 +150,18 @@ pub async fn filter_worker(
             }
         }
         if empty_stream_counter == filter_ids.len() {
+            println!("filter worker check ing for TERM");
             println!("FILTER WORKER {}: All streams empty", id);
-            tokio::time::sleep(tokio::time::Duration::from_secs(3)).await;
+            tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
+            alert_counter = 0;
+            if let Ok(command) = receiver.lock().unwrap().try_recv() {
+                match command {
+                    WorkerCmd::TERM => {
+                        println!("alert worker {} received termination command", id);
+                        return Ok(());
+                    },
+                }
+            }
         }
         empty_stream_counter = 0;
     }

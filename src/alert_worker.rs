@@ -1,7 +1,7 @@
 
 use std::sync::{mpsc, Arc, Mutex};
 use redis::AsyncCommands;
-use crate::{conf, alert, types::ztf_alert_schema, worker_util::WorkerCmd};
+use crate::{alert, conf, types::ztf_alert_schema, worker_util::{self, WorkerCmd}};
 
 
 // alert worker as a standalone function which is run by the scheduler
@@ -50,18 +50,23 @@ pub async fn alert_worker(
     let queue_temp_name = format!("{}_alerts_packet_queuetemp", stream_name);
     let classifer_queue_name = format!("{}_alerts_classifier_queue", stream_name);
 
+    let mut alert_counter = 0;
+    let command_interval = worker_util::get_check_command_interval(config_file);
     // ALERT SCHEMA (for fast avro decoding)
     let schema = ztf_alert_schema().unwrap();
     let mut count = 0;
     let start = std::time::Instant::now();
     loop {
-        // check for command from threadpool
-        if let Ok(command) = receiver.lock().unwrap().try_recv() {
-            match command {
-                WorkerCmd::TERM => {
-                    println!("alert worker {} received termination command", id);
-                    return;
-                },
+        // check for command from threadpool 
+        if alert_counter - command_interval > 0 {
+            alert_counter = 0;
+            if let Ok(command) = receiver.lock().unwrap().try_recv() {
+                match command {
+                    WorkerCmd::TERM => {
+                        println!("alert worker {} received termination command", id);
+                        return;
+                    },
+                }
             }
         }
         // retrieve candids from redis
@@ -69,6 +74,7 @@ pub async fn alert_worker(
         match result {
             Some(value) => {
                 let candid = alert::process_alert(value[0].clone(), &xmatch_configs, &db, &alert_collection, &alert_aux_collection, &schema).await;
+                alert_counter += 1;
                 match candid {
                     Ok(Some(candid)) => {
                         println!("Processed alert with candid: {}, queueing for classification", candid);
@@ -97,6 +103,16 @@ pub async fn alert_worker(
             None => {
                 println!("ALERT WORKER {}: Queue is empty", id);
                 tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
+                alert_counter = 0;
+                // check for command from threadpool
+                if let Ok(command) = receiver.lock().unwrap().try_recv() {
+                    match command {
+                        WorkerCmd::TERM => {
+                            println!("alert worker {} received termination command", id);
+                            return;
+                        },
+                    }
+                }
             }
         }
     }

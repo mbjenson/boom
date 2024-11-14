@@ -8,7 +8,7 @@ use std::{
 use futures::StreamExt;
 use redis::AsyncCommands;
 use mongodb::bson::{doc, Document};
-use crate::{conf, worker_util::WorkerCmd};
+use crate::{conf, worker_util::{self, WorkerCmd}};
 
 // fake ml worker which, like the ML worker, receives alerts from the alert worker and sends them
 //      to streams
@@ -29,15 +29,21 @@ pub async fn fake_ml_worker(
         "redis://localhost:6379".to_string()).unwrap();
     let mut con = client_redis
         .get_multiplexed_async_connection().await.unwrap();
+
+    let mut alert_counter = 0;
+    let command_interval = worker_util::get_check_command_interval(config_file);
     
     loop {
         // check for interrupt from thread pool
-        if let Ok(command) = receiver.lock().unwrap().try_recv() {
-            match command {
-                WorkerCmd::TERM => {
-                    println!("alert worker {} received termination command", id);
-                    return;
-                },
+        if alert_counter - command_interval > 0 {
+            alert_counter = 0;
+            if let Ok(command) = receiver.lock().unwrap().try_recv() {
+                match command {
+                    WorkerCmd::TERM => {
+                        println!("alert worker {} received termination command", id);
+                        return;
+                    },
+                }
             }
         }
 
@@ -63,9 +69,19 @@ pub async fn fake_ml_worker(
         if alerts.len() == 0 {
             println!("ML WORKER {}: queue empty", id);
             thread::sleep(time::Duration::from_secs(5));
+            alert_counter = 0;
+            if let Ok(command) = receiver.lock().unwrap().try_recv() {
+                match command {
+                    WorkerCmd::TERM => {
+                        println!("alert worker {} received termination command", id);
+                        return;
+                    },
+                }
+            }
             continue;
         } else {
             println!("ML WORKER {}: received alerts len: {}", id, alerts.len());
+            alert_counter += alerts.len() as i64;
         }
 
         let mut candids_grouped: HashMap<i32, Vec<i64>> = 

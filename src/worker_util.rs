@@ -1,6 +1,7 @@
 use std::{sync::{Mutex, Arc}, fmt};
 use redis::AsyncCommands;
 use redis::streams::{StreamReadOptions, StreamReadReply};
+use config::Config;
 
 // spawns a thread which listens for interrupt signal. Sets flag to true upon signal interruption
 pub async fn sig_int_handler(flag: Arc<Mutex<bool>>) {
@@ -63,6 +64,13 @@ pub async fn get_candids_from_stream(con: &mut redis::aio::MultiplexedConnection
     candids
 }
 
+pub fn get_check_command_interval(conf: Config) -> i64 {
+    let table = conf.get_table("workers")
+        .expect("worker table not found in config");
+    let check_command_interval = table.get("command_interval")
+        .expect("command_interval not found in config").to_owned().into_int().unwrap();
+    return check_command_interval;
+}
 
 #[derive(Clone, Debug)]
 pub enum WorkerType {
@@ -102,3 +110,4 @@ impl fmt::Display for WorkerCmd {
         write!(f, "{}", enum_str)
     }
 }
+
