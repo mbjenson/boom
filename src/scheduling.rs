@@ -32,7 +32,6 @@ impl ThreadPool {
         stream_name: String,
         config_path: String
     ) -> ThreadPool {
-        assert!(size > 0);
 
         let mut workers = HashMap::new();
         let mut senders = HashMap::new();
