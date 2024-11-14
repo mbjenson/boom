@@ -8,6 +8,7 @@ database:
   password: mongoadminsecret
   srv: false
 workers:
+  command_interval: 1000
   alert:
     n_workers: 3
   ml:
