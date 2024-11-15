@@ -100,7 +100,6 @@ pub async fn filter_worker(
     loop {
         // check for command from threadpool
         if alert_counter - command_interval > 0 {
-            println!("filter worker checking for TERM");
             alert_counter = 0;
             if let Ok(command) = receiver.lock().unwrap().try_recv() {
                 match command {
@@ -150,7 +149,6 @@ pub async fn filter_worker(
             }
         }
         if empty_stream_counter == filter_ids.len() {
-            println!("filter worker check ing for TERM");
             println!("FILTER WORKER {}: All streams empty", id);
             tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
             alert_counter = 0;
