@@ -64,10 +64,13 @@ pub async fn get_candids_from_stream(con: &mut redis::aio::MultiplexedConnection
     candids
 }
 
-pub fn get_check_command_interval(conf: Config) -> i64 {
+pub fn get_check_command_interval(conf: Config, stream_name: &str) -> i64 {
     let table = conf.get_table("workers")
         .expect("worker table not found in config");
-    let check_command_interval = table.get("command_interval")
+    let stream_table = table.get(stream_name.to_ascii_lowercase().as_str())
+        .expect(format!("stream name {} not found in config", stream_name).as_str())
+        .to_owned().into_table().unwrap();
+    let check_command_interval = stream_table.get("command_interval")
         .expect("command_interval not found in config").to_owned().into_int().unwrap();
     return check_command_interval;
 }

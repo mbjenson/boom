@@ -51,7 +51,7 @@ pub async fn alert_worker(
     let classifer_queue_name = format!("{}_alerts_classifier_queue", stream_name);
 
     let mut alert_counter = 0;
-    let command_interval = worker_util::get_check_command_interval(config_file);
+    let command_interval = worker_util::get_check_command_interval(config_file, &stream_name);
     // ALERT SCHEMA (for fast avro decoding)
     let schema = ztf_alert_schema().unwrap();
     let mut count = 0;

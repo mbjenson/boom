@@ -1,5 +1,6 @@
 
 use std::{sync::{mpsc, Arc, Mutex}, error::Error, collections::HashMap};
+use futures::stream;
 use redis::AsyncCommands;
 use crate::{conf, filter, worker_util::WorkerCmd, worker_util};
 use redis::streams::StreamReadOptions;
@@ -13,7 +14,7 @@ pub async fn filter_worker(
     config_path: String,
 ) -> Result<(), Box<dyn Error>> {
 
-    let catalog = stream_name;
+    let catalog = stream_name.clone();
     let filters = vec![3];
     let mut filter_ids: Vec<i32> = Vec::new();
 
@@ -33,7 +34,7 @@ pub async fn filter_worker(
         .get_multiplexed_async_connection().await.unwrap();
 
     let mut alert_counter = 0;
-    let command_interval = worker_util::get_check_command_interval(config_file);
+    let command_interval = worker_util::get_check_command_interval(config_file, &stream_name);
     
     // build filters and organize by permission level
     let mut filter_table: HashMap<i64, Vec<filter::Filter>> = HashMap::new();

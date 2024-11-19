@@ -20,7 +20,7 @@ pub async fn fake_ml_worker(
     config_path: String,
 ) {
     let ztf_allowed_permissions = vec![1, 2, 3];
-    let catalog = stream_name;
+    let catalog = stream_name.clone();
     let queue = format!("{}_alerts_classifier_queue", catalog);
 
     let config_file = conf::load_config(&config_path).unwrap();
@@ -31,7 +31,7 @@ pub async fn fake_ml_worker(
         .get_multiplexed_async_connection().await.unwrap();
 
     let mut alert_counter = 0;
-    let command_interval = worker_util::get_check_command_interval(config_file);
+    let command_interval = worker_util::get_check_command_interval(config_file, &stream_name);
     
     loop {
         // check for interrupt from thread pool
