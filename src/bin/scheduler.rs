@@ -50,11 +50,8 @@ async fn main() {
     println!("created workers");
 
     loop {
-        let exit = worker_util::check_flag(Arc::clone(&interrupt));
         println!("heart beat (MAIN)");
-
-        // sleep for 1 second
-        thread::sleep(std::time::Duration::from_secs(1));
+        let exit = worker_util::check_flag(Arc::clone(&interrupt));
         if exit {
             println!("killed thread(s)");
             drop(alert_pool);
@@ -62,6 +59,7 @@ async fn main() {
             drop(filter_pool);
             break;
         }
+        thread::sleep(std::time::Duration::from_secs(1));
     }
     println!("reached the end sir");
     std::process::exit(0);
