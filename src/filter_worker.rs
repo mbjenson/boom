@@ -1,6 +1,5 @@
 
 use std::{sync::{mpsc, Arc, Mutex}, error::Error, collections::HashMap};
-use futures::stream;
 use redis::AsyncCommands;
 use crate::{conf, filter, worker_util::WorkerCmd, worker_util};
 use redis::streams::StreamReadOptions;
