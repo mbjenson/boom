@@ -8,13 +8,14 @@ database:
   password: mongoadminsecret
   srv: false
 workers:
-  command_interval: 500
-  alert:
-    n_workers: 3
-  ml:
-    n_workers: 3
-  filter:
-    n_workers: 3
+  ZTF:
+    command_interval: 500
+    alert:
+      n_workers: 3
+    ml:
+      n_workers: 3
+    filter:
+      n_workers: 3
 crossmatch:
   ZTF:
     - catalog: PS1_DR1

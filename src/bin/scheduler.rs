@@ -2,10 +2,13 @@ use std::{env, sync::{Arc, Mutex}, thread};
 use boom::{worker_util::WorkerType, worker_util, scheduling::ThreadPool, conf};
 use config::Config;
 
-fn get_num_workers(conf: Config, worker_type: &str) -> i64 {
+fn get_num_workers(conf: Config, stream_name: &str, worker_type: &str) -> i64 {
     let table = conf.get_table("workers")
         .expect("worker table not found in config");
-    let worker_entry = table.get(worker_type)
+    let stream_table = table.get(stream_name.to_ascii_lowercase().as_str())
+        .expect(format!("stream name {} not found in config", stream_name).as_str())
+        .to_owned().into_table().unwrap();
+    let worker_entry = stream_table.get(worker_type)
         .expect(format!("{} not found in config", worker_type).as_str());
     let worker_entry = worker_entry.to_owned().into_table().unwrap();
     let n = worker_entry.get("n_workers")
@@ -34,10 +37,10 @@ async fn main() {
     let config_file = conf::load_config(config_path.as_str()).unwrap();
     // get num workers from config file
     
-    let n_alert = get_num_workers(config_file.to_owned(), "alert");
-    let n_ml = get_num_workers(config_file.to_owned(), "ml");
-    let n_filter = get_num_workers(config_file.to_owned(), "filter");
-    
+    let n_alert = get_num_workers(config_file.to_owned(), stream_name.as_str(), "alert");
+    let n_ml = get_num_workers(config_file.to_owned(), stream_name.as_str(), "ml");
+    let n_filter = get_num_workers(config_file.to_owned(), stream_name.as_str(), "filter");
+
     // setup signal handler thread
     let interrupt = Arc::new(Mutex::new(false));
     worker_util::sig_int_handler(Arc::clone(&interrupt)).await;
